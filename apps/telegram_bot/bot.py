@@ -1,12 +1,13 @@
-"""Aiogram bot launcher + handlers — FSM auth flow.
+"""Aiogram bot launcher + handlers — FSM auth flow (O'zbek tilida).
 
-Production behavior (MyBot.java'dan):
-1. /start → "Здравствуйте, для входа в систему пожалуйста введите ваш логин"
-2. User username yuboradi → DB'da topilsa, password so'raymiz; aks holda xato
-3. User parol yuboradi → BCrypt verify → User.telegram_id = chat_id, state = AUTHENTICATED
-4. AUTHENTICATED user → "Извините, этот бот предназначен только для уведомлений"
+Auth oqimi:
+1. /start → loginni so'raydi
+2. User username yuboradi → DB'da topilsa, parol so'raymiz; aks holda xato
+3. User parol yuboradi → check_password → User.telegram_id = chat_id, state = AUTHENTICATED
+4. AUTHENTICATED user → bu bot faqat bildirishnoma uchun ekanligi haqida xabar
 
-Bot alohida process'da ishlaydi: `python manage.py run_bot`
+Bot avtomatik ishga tushadi: `apps/telegram_bot/apps.py` orqali (server start bilan birga).
+Yoki alohida process'da: `python manage.py run_bot`
 """
 import asyncio
 import logging
@@ -60,11 +61,15 @@ async def cmd_start(message: Message, state: FSMContext):
     user = await find_user_by_telegram_id(message.chat.id)
     if user:
         await state.set_state(AuthStates.authenticated)
-        await message.answer("Вы уже прошли аутентификацию ✅")
+        await message.answer(
+            f"Salom, {user.first_name}! Siz allaqachon tizimga kirgansiz ✅\n\n"
+            "Yangi tadbir, topshiriq yoki xabarlar shu yerda yetkaziladi."
+        )
         return
     await state.set_state(AuthStates.waiting_username)
     await message.answer(
-        "Здравствуйте! Для входа в систему пожалуйста введите ваш логин:"
+        "Assalomu alaykum! 👋\n\n"
+        "Tizimga kirish uchun loginingizni yuboring:"
     )
 
 
@@ -72,12 +77,15 @@ async def on_username(message: Message, state: FSMContext):
     username = (message.text or '').strip()
     user = await find_user_by_username(username)
     if not user:
-        await message.answer("❌ Логин noto'g'ri. Iltimos, qayta urinib ko'ring.")
+        await message.answer(
+            "❌ Bunday login topilmadi.\n"
+            "Iltimos, loginingizni qayta tekshirib yuboring:"
+        )
         return
 
     await state.update_data(user_id=str(user.id))
     await state.set_state(AuthStates.waiting_password)
-    await message.answer("Endi parolingizni kiriting:")
+    await message.answer("🔑 Endi parolingizni kiriting:")
 
 
 async def on_password(message: Message, state: FSMContext):
@@ -86,26 +94,29 @@ async def on_password(message: Message, state: FSMContext):
     password = (message.text or '').strip()
     if not user_pk:
         await state.set_state(AuthStates.waiting_username)
-        await message.answer("Iltimos, /start orqali qayta boshlang.")
+        await message.answer("Iltimos, /start buyrug'i orqali qaytadan boshlang.")
         return
 
     ok = await verify_password_and_bind(user_pk, password, message.chat.id)
     if not ok:
-        await message.answer("❌ Parol noto'g'ri. Qayta kiriting:")
+        await message.answer("❌ Parol noto'g'ri. Qaytadan kiriting:")
         return
 
     await state.set_state(AuthStates.authenticated)
     await message.answer(
-        "Siz muvaffaqiyatli autentifikatsiyadan o'tdingiz ✅\n\n"
-        "Bu bot faqat bildirishnoma yuborish uchun. "
-        "Yangi tadbir, topshiriq yoki xabar bo'lganda men sizga shu yerda xabar beraman."
+        "✅ Tizimga muvaffaqiyatli kirdingiz!\n\n"
+        "Bu bot orqali sizga quyidagi bildirishnomalar yetkaziladi:\n"
+        "• Yangi tadbirlar\n"
+        "• Topshiriq va so'rovlar\n"
+        "• Yangi xabarlar\n\n"
+        "Asosiy ishlar — saytda: assistant.madaniyat.uz"
     )
 
 
 async def on_authenticated_other(message: Message):
     await message.answer(
-        "Bu bot faqat bildirishnoma uchun mo'ljallangan. "
-        "Asosiy ish — dashboard'da: assistant.madaniyat.uz"
+        "ℹ️ Bu bot faqat bildirishnoma yuborish uchun mo'ljallangan.\n\n"
+        "Asosiy ishlar dashboard'da bajariladi: assistant.madaniyat.uz"
     )
 
 

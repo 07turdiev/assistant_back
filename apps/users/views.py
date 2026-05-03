@@ -174,6 +174,72 @@ class UserViewSet(viewsets.ModelViewSet):
         user = self.get_object()
         return Response(UserShortSerializer(user, context={'request': request}).data)
 
+    @action(detail=False, methods=['get'], url_path='chief-candidates')
+    def chief_candidates(self, request):
+        """Berilgan yo'nalish uchun chief bo'lishi mumkin bo'lgan xodimlar.
+
+        - Avval yo'nalishning o'zidagi xodimlar (lavozim bo'yicha tartiblangan)
+        - Keyin ancestor yo'nalishlardagi (parent → grandparent → ...) xodimlar
+        - exclude — joriy tahrirlanayotgan user (o'zini chief qilmasin uchun)
+        """
+        from apps.directions.models import Direction
+
+        # Lavozim ustuvorligi (kichik raqam = yuqori daraja)
+        position_priority = {
+            'Vazir': 0, 'Вазир': 0,
+            "Vazir o'rinbosari": 1, "Вазир ўринбосари": 1,
+            "Vazirning birinchi o'rinbosari": 1, "Вазирнинг биринчи ўринбосари": 1,
+            'Maslahatchi': 1, 'Маслаҳатчи': 1,
+            "Vazir kotibiyati boshlig'i": 2, 'Вазир котибияти бошлиғи': 2,
+            "Boshqarma boshlig'i": 2, 'Бошқарма бошлиғи': 2,
+            "Bo'lim boshlig'i": 2, 'Бўлим бошлиғи': 2,
+            'Bosh buxgalter': 2, 'Бош бухгалтер': 2,
+            'Bosh yuriskonsult': 3, 'Бош юрисконсулт': 3,
+            'Referent kotib': 3, 'Референт котиб': 3,
+            'Bosh mutaxassis': 4, 'Бош мутахассис': 4,
+            'Etakchi mutaxassis': 5, 'Етакчи мутахассис': 5,
+            'Kichik mutaxassis': 6, 'Кичик мутахассис': 6,
+        }
+
+        def priority(user_obj):
+            for src in (user_obj.position_uz or '', user_obj.position_ru or ''):
+                src = src.strip()
+                if src in position_priority:
+                    return position_priority[src]
+                for prefix, prio in position_priority.items():
+                    if src.startswith(prefix):
+                        return prio
+            return 99
+
+        direction_id = request.query_params.get('direction_id')
+        exclude_id = request.query_params.get('exclude')
+
+        if not direction_id:
+            return Response([])
+
+        direction = Direction.objects.filter(pk=direction_id).first()
+        if not direction:
+            return Response([])
+
+        # Yo'nalish va ancestor'larini ketma-ket aylanib, har birida xodimlarni topamiz
+        seen_ids = set()
+        candidates = []
+        current = direction
+        while current is not None:
+            qs = User.objects.filter(direction=current, enabled=True).select_related('role')
+            if exclude_id:
+                qs = qs.exclude(pk=exclude_id)
+            users_in_dir = sorted(qs, key=priority)
+            for u in users_in_dir:
+                if u.id not in seen_ids:
+                    candidates.append(u)
+                    seen_ids.add(u.id)
+            current = current.parent
+
+        return Response(UserShortSerializer(
+            candidates, many=True, context={'request': request},
+        ).data)
+
     # ---- Admin actions ----
 
     @action(detail=True, methods=['patch'], url_path='status')

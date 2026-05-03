@@ -175,6 +175,8 @@ VAPID_CLAIMS_EMAIL = config('VAPID_CLAIMS_EMAIL', default='mailto:admin@example.
 # Telegram bot
 TG_BOT_TOKEN = config('TG_BOT_TOKEN', default='')
 TG_BOT_USERNAME = config('TG_BOT_USERNAME', default='')
+# Server ishga tushganda bot ham avtomatik daemon thread'da ishga tushadimi
+TG_BOT_AUTOSTART = config('TG_BOT_AUTOSTART', default=False, cast=bool)
 
 # SMS provider (production: 91.204.239.44/broker-api/send)
 SMS_API_URL = config('SMS_API_URL', default='')
