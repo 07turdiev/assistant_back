@@ -67,6 +67,15 @@ class UserCreateSerializer(serializers.ModelSerializer):
     direction_id = serializers.UUIDField(required=False, allow_null=True, write_only=True)
     chief_id = serializers.UUIDField(required=False, allow_null=True, write_only=True)
 
+    def to_internal_value(self, data):
+        cleaned = dict(data)
+        for key in ('direction_id', 'chief_id'):
+            if key in cleaned and cleaned[key] in ('', None):
+                cleaned[key] = None
+        if cleaned.get('email') == '':
+            cleaned['email'] = None
+        return super().to_internal_value(cleaned)
+
     class Meta:
         model = User
         fields = (
@@ -75,7 +84,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
             'position_uz', 'position_ru',
             'phone_number', 'email', 'office_number',
             'role_id', 'direction_id', 'chief_id',
-            'status', 'enabled',
+            'status', 'enabled', 'company_car',
         )
         read_only_fields = ('id',)
 
@@ -100,6 +109,16 @@ class UserAdminUpdateSerializer(serializers.ModelSerializer):
     direction_id = serializers.UUIDField(required=False, allow_null=True)
     chief_id = serializers.UUIDField(required=False, allow_null=True)
 
+    def to_internal_value(self, data):
+        # Bo'sh stringlarni null'ga o'giramiz (UUIDField/email tekshiruvini buzmasligi uchun)
+        cleaned = dict(data)
+        for key in ('direction_id', 'chief_id'):
+            if key in cleaned and cleaned[key] in ('', None):
+                cleaned[key] = None
+        if cleaned.get('email') == '':
+            cleaned['email'] = None
+        return super().to_internal_value(cleaned)
+
     class Meta:
         model = User
         fields = (
@@ -107,7 +126,7 @@ class UserAdminUpdateSerializer(serializers.ModelSerializer):
             'position_uz', 'position_ru',
             'phone_number', 'email', 'office_number',
             'role_id', 'direction_id', 'chief_id',
-            'status', 'enabled',
+            'status', 'enabled', 'company_car',
         )
 
 
