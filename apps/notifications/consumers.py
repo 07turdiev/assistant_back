@@ -46,13 +46,42 @@ class UnifiedConsumer(AsyncJsonWebsocketConsumer):
     async def receive_json(self, content, **kwargs):
         """Client → server xabar.
 
-        Hozircha asosan ping-pong va kelajakda chat send.
+        Qo'llab-quvvatlanadigan kanallar:
+        - `ping` — keep-alive
+        - `chat` — yangi xabar yuborish (production `/app/talking` ekvivalenti)
+        - `notify.read` — bildirishnoma ko'rilgan deb belgilash
         """
         channel = content.get('channel')
         if channel == 'ping':
             await self.send_json({'channel': 'pong'})
             return
-        # boshqalari (chat send va h.k.) keyingi sprintda
+
+        if channel == 'chat':
+            from channels.db import database_sync_to_async
+
+            from apps.chat.services import ChatService
+
+            receiver_id = content.get('to')
+            message = (content.get('message') or '').strip()
+            if not receiver_id or not message:
+                return
+
+            try:
+                msg = await database_sync_to_async(ChatService.send)(
+                    sender=self.user, receiver_id=receiver_id, message=message,
+                )
+                # Sender'ga ham echo (UI darhol ko'rsatish uchun)
+                await self.send_json({
+                    'channel': 'chat',
+                    'from': self.user_id,
+                    'to': str(receiver_id),
+                    'message_id': str(msg.id),
+                    'message': msg.message,
+                    'created_at': msg.created_at.isoformat(),
+                    'echo': True,
+                })
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f'WS chat send xatosi: {e}')
 
     # group_send'dan kelgan xabarlarni client'ga forward qilish
     async def notify_message(self, event):

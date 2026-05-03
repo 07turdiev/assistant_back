@@ -32,7 +32,11 @@ INSTALLED_APPS = [
     'apps.directions',
     'apps.attachments',
     'apps.events',
+    'apps.reports',
+    'apps.chat',
     'apps.notifications',
+    'apps.scheduler',
+    'apps.telegram_bot',
     'apps.auth_app',
     'apps.info',
 ]
@@ -102,7 +106,7 @@ LANGUAGES = [
     ('ru', 'Русский'),
 ]
 
-STATIC_URL = 'static/'
+STATIC_URL = 'django-static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 MEDIA_URL = 'media/'
@@ -167,6 +171,24 @@ SPECTACULAR_SETTINGS = {
 VAPID_PUBLIC_KEY = config('VAPID_PUBLIC_KEY', default='')
 VAPID_PRIVATE_KEY = config('VAPID_PRIVATE_KEY', default='')
 VAPID_CLAIMS_EMAIL = config('VAPID_CLAIMS_EMAIL', default='mailto:admin@example.com')
+
+# Telegram bot
+TG_BOT_TOKEN = config('TG_BOT_TOKEN', default='')
+TG_BOT_USERNAME = config('TG_BOT_USERNAME', default='')
+
+# SMS provider (production: 91.204.239.44/broker-api/send)
+SMS_API_URL = config('SMS_API_URL', default='')
+SMS_API_LOGIN = config('SMS_API_LOGIN', default='')
+SMS_API_PASSWORD = config('SMS_API_PASSWORD', default='')
+SMS_API_ORIGINATOR = config('SMS_API_ORIGINATOR', default='3700')
+
+# Email (Gmail SMTP)
+EMAIL_HOST = config('SMTP_HOST', default='smtp.gmail.com')
+EMAIL_PORT = config('SMTP_PORT', default=587, cast=int)
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = config('SMTP_USER', default='')
+EMAIL_HOST_PASSWORD = config('SMTP_PASSWORD', default='')
+DEFAULT_FROM_EMAIL = config('SMTP_FROM', default='') or EMAIL_HOST_USER
 
 # Admin theme tweaks
 ADMIN_SITE_HEADER = 'Smart Assistant — Emergency Admin'

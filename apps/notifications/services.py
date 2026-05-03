@@ -132,6 +132,10 @@ class NotificationService:
         start_dt = datetime.combine(event.date, event.start_time)
         end_dt = datetime.combine(event.date, event.end_time)
 
+        # Bulk SMS/Email destinationlarini yig'ib olamiz (har user uchun alohida emas, bir batch)
+        sms_phones: list[str] = []
+        emails: list[str] = []
+
         for user in recipients:
             # 2. DB ga Notification yozish (audit/history)
             Notification.objects.create(
@@ -170,14 +174,36 @@ class NotificationService:
             except Exception as e:  # noqa: BLE001
                 logger.exception(f'Web Push xatosi (user={user.id}): {e}')
 
-            # 5. SMS / Email / Telegram — Celery yo'q paytda log
+            # 5. Telegram (TG_BOT_TOKEN bo'lsa real yuboriladi)
+            if user.telegram_id:
+                try:
+                    from apps.telegram_bot.notify import send_message as send_tg
+                    send_tg(user.telegram_id, full_sms)
+                except Exception as e:  # noqa: BLE001
+                    logger.warning(f'Telegram dispatch xatosi (user={user.id}): {e}')
+
+            # 6. SMS / Email destinationlarini batch'ga yig'amiz
             phone = (user.phone_number or '').strip()
             if phone:
-                logger.info(f'[SMS pending] {phone} | {full_sms[:80]}')
+                sms_phones.append(phone)
             if user.email:
-                logger.info(f'[Email pending] {user.email} | {event.title}')
-            if user.telegram_id:
-                logger.info(f'[TG pending] {user.telegram_id} | {full_sms[:80]}')
+                emails.append(user.email)
+
+        # 7. Bulk SMS yuborish (provider bitta API call'da bir nechta xabar qabul qiladi)
+        if sms_phones:
+            try:
+                from .sms import send_to_many as send_sms_batch
+                send_sms_batch(sms_phones, full_sms)
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f'SMS batch dispatch xatosi: {e}')
+
+        # 8. Bulk Email yuborish
+        if emails:
+            try:
+                from .email import send_to_many as send_email_batch
+                send_email_batch(emails, full_sms, subject=f'Smart Assistant: {event.title}')
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f'Email batch dispatch xatosi: {e}')
 
     @classmethod
     def dispatch_pre_event(cls, pre_event, *, recipient_ids: list) -> None:

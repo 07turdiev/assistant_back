@@ -155,7 +155,7 @@ class Command(BaseCommand):
 
     def _seed_organisation(self, district):
         org, _ = Organisation.objects.get_or_create(
-            name_uz='Madaniyat va turizm vazirligi',
+            name_uz='Madaniyat vazirligi',
             defaults={
                 'name_ru': 'Министерство культуры и туризма',
                 'address_uz': 'Toshkent shahri',

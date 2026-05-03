@@ -42,7 +42,7 @@ python manage.py seed
 Yaratiladi:
 - 8 ta rol (`SUPER_ADMIN`, `PREMIER_MINISTER`, `VICE_MINISTER`, `ASSISTANT_PREMIER`, `HEAD`, `ASSISTANT`, `ADMIN`, `EMPLOYEE`)
 - 2 ta region (Toshkent shahri, Toshkent viloyati) + 11 ta tuman
-- 1 ta tashkilot (Madaniyat va turizm vazirligi)
+- 1 ta tashkilot (Madaniyat vazirligi)
 - 4 ta direction (Vazir + 3 ta bola)
 - 6 ta test foydalanuvchi (parol: `Admin12345!`):
   - `superadmin` — SUPER_ADMIN (Django emergency admin uchun ham `is_superuser=True`)

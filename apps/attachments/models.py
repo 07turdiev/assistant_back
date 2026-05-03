@@ -28,7 +28,12 @@ class Attachment(AuditMixin):
         null=True, blank=True,
         related_name='protocols',
     )
-    # file_chat — Chat ilovasi yaratilganda alohida migratsiyada qo'shiladi
+    file_chat = models.ForeignKey(
+        'chat.ChatMessage',
+        on_delete=models.CASCADE,
+        null=True, blank=True,
+        related_name='files',
+    )
 
     class Meta:
         ordering = ['-created_at']

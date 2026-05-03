@@ -18,6 +18,8 @@ urlpatterns = [
     path('districts/', include(districts_router.urls)),
     path('events/', include(events_router.urls)),
     path('pre-events/', include(pre_events_router.urls)),
+    path('reports/', include('apps.reports.urls')),
+    path('chat/', include('apps.chat.urls')),
     path('notifications/', include(notifications_urlpatterns)),
     path('webpush/', include(webpush_urlpatterns)),
     path('file/', include('apps.attachments.urls')),

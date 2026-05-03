@@ -28,6 +28,23 @@ def _dispatch_notification(event, notification_type: str) -> None:
         logger.exception(f'Notification dispatch xatosi ({notification_type}): {e}')
 
 
+def _schedule_reminders(event) -> None:
+    """notify_time bo'yicha reminder'larni rejalashtirish."""
+    try:
+        from apps.scheduler.services import schedule_event_reminders
+        schedule_event_reminders(event)
+    except Exception as e:  # noqa: BLE001
+        logger.exception(f'Schedule reminders xatosi (event={event.id}): {e}')
+
+
+def _cancel_reminders(event_id) -> None:
+    try:
+        from apps.scheduler.services import cancel_event_reminders
+        cancel_event_reminders(event_id)
+    except Exception as e:  # noqa: BLE001
+        logger.exception(f'Cancel reminders xatosi (event={event_id}): {e}')
+
+
 class EventService:
     """Tadbir yaratish/tahrirlash/o'chirish."""
 
@@ -114,7 +131,8 @@ class EventService:
         # Bildirishnoma — barcha qatnashchilar va recursive yordamchilarga
         transaction.on_commit(lambda: _dispatch_notification(event, NotificationType.NEW))
 
-        # TODO: schedule reminders (scheduler app yaratilganda)
+        # Reminder'larni rejalashtirish (har notify_time uchun)
+        transaction.on_commit(lambda: _schedule_reminders(event))
 
         return event
 
@@ -179,6 +197,12 @@ class EventService:
         # Bildirishnoma EDITED
         transaction.on_commit(lambda: _dispatch_notification(event, NotificationType.EDITED))
 
+        # Eski reminder'larni bekor qilib qaytadan rejalashtirish
+        # (notify_time o'zgargan bo'lishi mumkin)
+        event_id = event.id
+        transaction.on_commit(lambda: _cancel_reminders(event_id))
+        transaction.on_commit(lambda: _schedule_reminders(event))
+
         return event
 
     @classmethod
@@ -192,6 +216,10 @@ class EventService:
         # event row o'chgandan keyin ham audit trail sifatida qoladi).
         # WS push esa transaction commit'da yuboriladi.
         _dispatch_notification(event, NotificationType.DELETED)
+
+        # Reminder'larni bekor qilish
+        event_id = event.id
+        transaction.on_commit(lambda: _cancel_reminders(event_id))
 
         # Fayllarni diskdan ham tozalash
         for att in list(event.files.all()) + list(event.protocols.all()):
