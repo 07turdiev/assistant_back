@@ -13,6 +13,7 @@ from django.db import transaction
 from django.db.models import Count, Q
 
 from apps.attachments.services import secure_upload
+from apps.notifications.webpush import send_to_user as send_webpush_to_user
 from apps.users.models import User
 
 from .models import ChatMessage
@@ -67,6 +68,22 @@ class ChatService:
             'message': msg.message,
             'created_at': msg.created_at.isoformat(),
         })
+
+        # Web Push (tab yopiq/blur bo'lganda OS bildirishnomasi)
+        try:
+            sender_name = ' '.join(filter(None, [sender.last_name, sender.first_name])).strip() \
+                or sender.username
+            preview = (msg.message or ('📎 Fayl' if files else '')).strip()[:140]
+            send_webpush_to_user(
+                receiver.id,
+                title=sender_name,
+                body=preview,
+                url=f'/?openChat={sender.id}',
+                tag=f'chat-{sender.id}',
+                data={'channel': 'chat', 'sender_id': str(sender.id), 'skipIfFocused': True},
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f'Chat web push xatosi: {e}')
 
         return msg
 
