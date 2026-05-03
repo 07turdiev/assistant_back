@@ -120,15 +120,59 @@ class UserViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def participants(self, request):
-        # Hozircha barcha enabled userlar; band/bo'sh logika events appida ulanadi
+        """Tadbir/topshiriq qatnashchilari. Filterlar:
+        - direction_id — yo'nalish bo'yicha (joriy va bola yo'nalishlar uchun cascade)
+        - organisation_id — tashkilot bo'yicha
+        - chief_id — bevosita yordamchilar (subordinates)
+        - search — F.I.Sh., username, email bo'yicha
+        """
+        from django.db.models import Q
+        from apps.directions.models import Direction
+
         qs = self.queryset.filter(enabled=True)
+
         direction_id = request.query_params.get('direction_id')
         organisation_id = request.query_params.get('organisation_id')
+        chief_id = request.query_params.get('chief_id')
+        search = (request.query_params.get('search') or '').strip()
+
         if direction_id:
-            qs = qs.filter(direction_id=direction_id)
+            # Yo'nalish va uning barcha bola yo'nalishlari (MPTT cascade)
+            try:
+                direction = Direction.objects.get(pk=direction_id)
+                descendants = direction.get_descendants(include_self=True)
+                qs = qs.filter(direction__in=descendants)
+            except Direction.DoesNotExist:
+                qs = qs.none()
         if organisation_id:
             qs = qs.filter(direction__organisation_id=organisation_id)
+        if chief_id:
+            qs = qs.filter(chief_id=chief_id)
+        if search:
+            qs = qs.filter(
+                Q(first_name__icontains=search)
+                | Q(last_name__icontains=search)
+                | Q(father_name__icontains=search)
+                | Q(username__icontains=search)
+                | Q(email__icontains=search)
+            )
+
         return Response(UserShortSerializer(qs, many=True, context={'request': request}).data)
+
+    @action(detail=True, methods=['get'])
+    def subordinates(self, request, pk=None):
+        """Foydalanuvchining bevosita yordamchilari (chief_id = this user)."""
+        qs = self.queryset.filter(chief_id=pk, enabled=True)
+        return Response(UserShortSerializer(qs, many=True, context={'request': request}).data)
+
+    @action(detail=True, methods=['get'], url_path='full')
+    def full_info(self, request, pk=None):
+        """Foydalanuvchining to'liq ma'lumotlari (Detail page'lar uchun).
+
+        Production'dagi `/api/user/full-info/{id}` ga ekvivalent.
+        """
+        user = self.get_object()
+        return Response(UserShortSerializer(user, context={'request': request}).data)
 
     # ---- Admin actions ----
 

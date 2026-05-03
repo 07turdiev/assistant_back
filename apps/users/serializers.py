@@ -13,6 +13,8 @@ class RoleSerializer(serializers.ModelSerializer):
 class UserShortSerializer(serializers.ModelSerializer):
     role = RoleSerializer(read_only=True)
     avatar_url = serializers.SerializerMethodField()
+    chief_id = serializers.UUIDField(read_only=True, allow_null=True)
+    direction_id = serializers.UUIDField(read_only=True, allow_null=True)
 
     class Meta:
         model = User
@@ -20,6 +22,7 @@ class UserShortSerializer(serializers.ModelSerializer):
             'id', 'username', 'first_name', 'last_name', 'father_name',
             'position_uz', 'position_ru', 'phone_number', 'email',
             'role', 'status', 'enabled', 'avatar_url', 'telegram_id',
+            'chief_id', 'direction_id',
         )
 
     def get_avatar_url(self, obj: User):
