@@ -39,6 +39,8 @@ INSTALLED_APPS = [
     'apps.telegram_bot',
     'apps.auth_app',
     'apps.info',
+    'apps.ai',
+    'apps.drafts',
 ]
 
 # Channels — dev uchun in-memory layer (Redis bo'lmasa ham ishlaydi)
@@ -191,6 +193,18 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = config('SMTP_USER', default='')
 EMAIL_HOST_PASSWORD = config('SMTP_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = config('SMTP_FROM', default='') or EMAIL_HOST_USER
+
+# AI / LLM (Ollama lokal server)
+OLLAMA_URL = config('OLLAMA_URL', default='http://localhost:11434')
+OLLAMA_MODEL = config('OLLAMA_MODEL', default='qwen3:14b')
+
+# STT — UzbekVoice.ai
+UZBEKVOICE_API_KEY = config('UZBEKVOICE_API_KEY', default='')
+UZBEKVOICE_LANGUAGE = config('UZBEKVOICE_LANGUAGE', default='uz')
+UZBEKVOICE_MODEL = config('UZBEKVOICE_MODEL', default='general')
+
+# Voice fayllarni saqlash muddati (kun) — keyin auto-delete
+VOICE_FILE_RETENTION_DAYS = config('VOICE_FILE_RETENTION_DAYS', default=30, cast=int)
 
 # Admin theme tweaks
 ADMIN_SITE_HEADER = 'Smart Assistant — Emergency Admin'

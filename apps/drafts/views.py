@@ -1,0 +1,126 @@
+"""Draft REST API.
+
+Endpoints:
+- GET    /api/drafts/events/                    — joriy foydalanuvchining qoralamalari
+- GET    /api/drafts/events/{id}/               — bitta qoralama
+- PATCH  /api/drafts/events/{id}/               — tahrirlash
+- POST   /api/drafts/events/{id}/publish/       — joylash → Event yaratiladi
+- POST   /api/drafts/events/{id}/reject/        — rad etish
+- DELETE /api/drafts/events/{id}/               — o'chirish (faqat created_by yoki assigned_to)
+
+Reports uchun ham xuddi shu URL'lar (/api/drafts/reports/...).
+"""
+from django.core.exceptions import ValidationError
+from django.db.models import Q
+from rest_framework import mixins, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
+from apps.events.serializers import EventDetailSerializer
+from apps.reports.serializers import ReportSerializer
+
+from .enums import DraftStatus
+from .models import EventDraft, ReportDraft
+from .serializers import (
+    EventDraftSerializer,
+    EventDraftUpdateSerializer,
+    RejectSerializer,
+    ReportDraftSerializer,
+    ReportDraftUpdateSerializer,
+)
+from .services import publish_event_draft, publish_report_draft, reject_draft
+
+
+class _DraftViewSetBase(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
+    mixins.DestroyModelMixin,
+    viewsets.GenericViewSet,
+):
+    """Faqat shu foydalanuvchiga tegishli qoralamalar (created_by yoki assigned_to)."""
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['get', 'patch', 'post', 'delete']
+
+    def get_queryset(self):
+        user = self.request.user
+        # Foydalanuvchi yaratgan VA unga tayinlangan qoralamalar
+        return self.queryset_model.objects.filter(
+            Q(created_by=user) | Q(assigned_to=user)
+        ).select_related('created_by', 'assigned_to', 'target_direction').distinct()
+
+
+class EventDraftViewSet(_DraftViewSetBase):
+    queryset_model = EventDraft
+    queryset = EventDraft.objects.all()
+
+    def get_serializer_class(self):
+        if self.action in ('partial_update', 'update'):
+            return EventDraftUpdateSerializer
+        return EventDraftSerializer
+
+    @action(detail=True, methods=['post'], url_path='publish')
+    def publish(self, request, pk=None):
+        draft = self.get_object()
+        try:
+            event = publish_event_draft(draft)
+        except ValidationError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Joylangach — yaratilgan Event'ni qaytaramiz
+        return Response(
+            {
+                'draft': EventDraftSerializer(draft, context={'request': request}).data,
+                'event': EventDetailSerializer(event, context={'request': request}).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=True, methods=['post'], url_path='reject')
+    def reject(self, request, pk=None):
+        draft = self.get_object()
+        serializer = RejectSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            reject_draft(draft, reason=serializer.validated_data.get('reason', ''))
+        except ValidationError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(EventDraftSerializer(draft, context={'request': request}).data)
+
+
+class ReportDraftViewSet(_DraftViewSetBase):
+    queryset_model = ReportDraft
+    queryset = ReportDraft.objects.all()
+
+    def get_serializer_class(self):
+        if self.action in ('partial_update', 'update'):
+            return ReportDraftUpdateSerializer
+        return ReportDraftSerializer
+
+    @action(detail=True, methods=['post'], url_path='publish')
+    def publish(self, request, pk=None):
+        draft = self.get_object()
+        try:
+            report = publish_report_draft(draft)
+        except ValidationError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(
+            {
+                'draft': ReportDraftSerializer(draft, context={'request': request}).data,
+                'report': ReportSerializer(report, context={'request': request}).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=True, methods=['post'], url_path='reject')
+    def reject(self, request, pk=None):
+        draft = self.get_object()
+        serializer = RejectSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            reject_draft(draft, reason=serializer.validated_data.get('reason', ''))
+        except ValidationError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(ReportDraftSerializer(draft, context={'request': request}).data)

@@ -1,0 +1,228 @@
+{
+  "today": "2026-05-05",
+  "today_weekday": "seshanba",
+  "cases": [
+    {
+      "id": 1,
+      "category": "event_basic",
+      "input": "Ertaga soat 14 da Senat zalida kollegiya yig'ilishi, Akmal aka ma'ruzachi, 90 daqiqa",
+      "expected": {
+        "type": "event",
+        "date": "2026-05-06",
+        "start_time": "14:00",
+        "end_time": "15:30",
+        "duration_minutes": 90,
+        "location": "Senat zali",
+        "mentioned_participants": ["Akmal"],
+        "target_department": null,
+        "is_private": false,
+        "is_important": false
+      }
+    },
+    {
+      "id": 2,
+      "category": "report_to_person",
+      "input": "Sherzodga aytinglar Toshkent viloyat hisobotini juma kuniga tayyorlasin",
+      "expected": {
+        "type": "report",
+        "mentioned_participants": ["Sherzod"],
+        "target_department": null,
+        "is_important": false
+      }
+    },
+    {
+      "id": 3,
+      "category": "report_to_department",
+      "input": "Moliya boshqaruvi byudjet hisobotini 3 kun ichida tayyorlasin",
+      "expected": {
+        "type": "report",
+        "target_department": "Moliya boshqaruvi",
+        "mentioned_participants": []
+      }
+    },
+    {
+      "id": 4,
+      "category": "event_private",
+      "input": "Indinga ertalab soat 10 da yopiq prezidium, ishtirokchilar Bekzod va Dilshod",
+      "expected": {
+        "type": "event",
+        "date": "2026-05-07",
+        "start_time": "10:00",
+        "is_private": true,
+        "mentioned_participants": ["Bekzod", "Dilshod"]
+      }
+    },
+    {
+      "id": 5,
+      "category": "event_important",
+      "input": "Bugun soat 16 30 da muhim kengash bo'ladi, vazir o'rinbosari ishtirok etadi",
+      "expected": {
+        "type": "event",
+        "date": "2026-05-05",
+        "start_time": "16:30",
+        "is_important": true
+      }
+    },
+    {
+      "id": 6,
+      "category": "report_simple",
+      "input": "Akmal akadan o'tgan oygi mehmonxona bo'yicha hisobotni so'rayapman",
+      "expected": {
+        "type": "report",
+        "mentioned_participants": ["Akmal"],
+        "target_department": null
+      }
+    },
+    {
+      "id": 7,
+      "category": "event_relative_day",
+      "input": "Juma kuni soat 11 da Vazir o'rinbosari bilan kichik kengash, davomiyligi 1 soat",
+      "expected": {
+        "type": "event",
+        "date": "2026-05-08",
+        "start_time": "11:00",
+        "end_time": "12:00",
+        "duration_minutes": 60
+      }
+    },
+    {
+      "id": 8,
+      "category": "report_urgent",
+      "input": "Behzod akaga shoshilinch topshiriq — ertaga soatgacha hokimlikka javob xat tayyorlasin",
+      "expected": {
+        "type": "report",
+        "mentioned_participants": ["Behzod"],
+        "is_important": true
+      }
+    },
+    {
+      "id": 9,
+      "category": "event_with_location",
+      "input": "Keyingi dushanba soat 9 da konferens-zalda madaniyat masalasi bo'yicha seminar",
+      "expected": {
+        "type": "event",
+        "date": "2026-05-11",
+        "start_time": "09:00",
+        "location": "konferens-zal"
+      }
+    },
+    {
+      "id": 10,
+      "category": "report_department",
+      "input": "Yoshlar siyosati bo'limi uchrashuv to'g'risida hisobot tayyorlab bersin, muhim",
+      "expected": {
+        "type": "report",
+        "target_department": "Yoshlar siyosati bo'limi",
+        "is_important": true
+      }
+    },
+    {
+      "id": 11,
+      "category": "event_multiple_participants",
+      "input": "Chorshanba kuni 15 00 da kichik majlis, qatnashadi Olim, Salim va Karim, Xalq do'stligi muzeyida",
+      "expected": {
+        "type": "event",
+        "date": "2026-05-06",
+        "start_time": "15:00",
+        "mentioned_participants": ["Olim", "Salim", "Karim"],
+        "location": "Xalq do'stligi muzeyi"
+      }
+    },
+    {
+      "id": 12,
+      "category": "report_with_deadline",
+      "input": "Sanjar akaga 5 kun muhlat, prezident farmoni ijrosi bo'yicha hisobot",
+      "expected": {
+        "type": "report",
+        "mentioned_participants": ["Sanjar"]
+      }
+    },
+    {
+      "id": 13,
+      "category": "event_evening_time",
+      "input": "Bugun kechqurun soat 7 da nodavlat tashkilotlar vakillari bilan uchrashuv",
+      "expected": {
+        "type": "event",
+        "date": "2026-05-05",
+        "start_time": "19:00"
+      }
+    },
+    {
+      "id": 14,
+      "category": "report_to_assistant",
+      "input": "Yordamchimga ayting bugun choyxonadagi tushlik uchrashuvini bekor qilsin",
+      "expected": {
+        "type": "report",
+        "target_department": null
+      }
+    },
+    {
+      "id": 15,
+      "category": "event_with_speaker",
+      "input": "12-may juma kuni 10 30 da prezidium, ma'ruzachi Sodiq aka, davomiyligi 2 soat",
+      "expected": {
+        "type": "event",
+        "date": "2026-05-12",
+        "start_time": "10:30",
+        "end_time": "12:30",
+        "duration_minutes": 120,
+        "mentioned_participants": ["Sodiq"]
+      }
+    },
+    {
+      "id": 16,
+      "category": "report_complex",
+      "input": "Toshkent viloyat hokimligidan kelgan xat haqida hisobot tayyorlash kerak, javobgar Behzod aka, muddat 3 kun, muhim",
+      "expected": {
+        "type": "report",
+        "mentioned_participants": ["Behzod"],
+        "is_important": true
+      }
+    },
+    {
+      "id": 17,
+      "category": "event_minimal",
+      "input": "Ertaga soat 12 da tushlik uchrashuvi",
+      "expected": {
+        "type": "event",
+        "date": "2026-05-06",
+        "start_time": "12:00"
+      }
+    },
+    {
+      "id": 18,
+      "category": "event_department_speakers",
+      "input": "Kadrlar boshqaruvi va Huquq bo'limi vakillari bilan payshanba kuni 14 da yopiq majlis",
+      "expected": {
+        "type": "event",
+        "date": "2026-05-07",
+        "start_time": "14:00",
+        "is_private": true,
+        "target_department": "Kadrlar boshqaruvi"
+      }
+    },
+    {
+      "id": 19,
+      "category": "report_multiple_people",
+      "input": "Akmal va Bekzodga aytinglar madaniy meros saqlash bo'yicha qo'shma hisobot tayyorlasinlar",
+      "expected": {
+        "type": "report",
+        "mentioned_participants": ["Akmal", "Bekzod"]
+      }
+    },
+    {
+      "id": 20,
+      "category": "event_important_private",
+      "input": "Ertaga 9 00 da muhim va yopiq kengash, 3 soat davom etadi, faqat rahbariyat ishtirok etadi",
+      "expected": {
+        "type": "event",
+        "date": "2026-05-06",
+        "start_time": "09:00",
+        "end_time": "12:00",
+        "duration_minutes": 180,
+        "is_important": true,
+        "is_private": true
+      }
+    }
+  ]
+}

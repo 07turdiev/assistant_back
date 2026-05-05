@@ -19,6 +19,7 @@ urlpatterns = [
     path('events/', include(events_router.urls)),
     path('pre-events/', include(pre_events_router.urls)),
     path('reports/', include('apps.reports.urls')),
+    path('drafts/', include('apps.drafts.urls')),
     path('chat/', include('apps.chat.urls')),
     path('notifications/', include(notifications_urlpatterns)),
     path('webpush/', include(webpush_urlpatterns)),

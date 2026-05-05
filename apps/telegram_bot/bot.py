@@ -12,7 +12,7 @@ Yoki alohida process'da: `python manage.py run_bot`
 import asyncio
 import logging
 
-from aiogram import Bot, Dispatcher
+from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -20,6 +20,9 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import Message
 from asgiref.sync import sync_to_async
 from django.conf import settings
+
+from .keyboards import main_reply_keyboard
+from .voice_handlers import register_voice_handlers
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +66,8 @@ async def cmd_start(message: Message, state: FSMContext):
         await state.set_state(AuthStates.authenticated)
         await message.answer(
             f"Salom, {user.first_name}! Siz allaqachon tizimga kirgansiz ✅\n\n"
-            "Yangi tadbir, topshiriq yoki xabarlar shu yerda yetkaziladi."
+            "Pastdagi tugmalardan foydalaning yoki ovozli xabar yuboring.",
+            reply_markup=main_reply_keyboard(),
         )
         return
     await state.set_state(AuthStates.waiting_username)
@@ -105,18 +109,19 @@ async def on_password(message: Message, state: FSMContext):
     await state.set_state(AuthStates.authenticated)
     await message.answer(
         "✅ Tizimga muvaffaqiyatli kirdingiz!\n\n"
-        "Bu bot orqali sizga quyidagi bildirishnomalar yetkaziladi:\n"
-        "• Yangi tadbirlar\n"
-        "• Topshiriq va so'rovlar\n"
-        "• Yangi xabarlar\n\n"
-        "Asosiy ishlar — saytda: assistant.madaniyat.uz"
+        "Pastdagi tugmalardan foydalaning yoki ovozli xabar yuboring:\n"
+        "🎤 Topshiriq berish — ovozli buyruq orqali topshiriq qoralamasini yarating\n"
+        "📅 Tadbir yaratish — ovoz orqali tadbir qoralamasini tayyorlang\n\n"
+        "Saytdagi to'liq ko'rinish: assistant.madaniyat.uz",
+        reply_markup=main_reply_keyboard(),
     )
 
 
 async def on_authenticated_other(message: Message):
     await message.answer(
-        "ℹ️ Bu bot faqat bildirishnoma yuborish uchun mo'ljallangan.\n\n"
-        "Asosiy ishlar dashboard'da bajariladi: assistant.madaniyat.uz"
+        "ℹ️ Buyruqni tushunmadim. Pastdagi tugmalardan foydalaning yoki "
+        "/start orqali boshlang.",
+        reply_markup=main_reply_keyboard(),
     )
 
 
@@ -127,7 +132,13 @@ def create_dispatcher() -> Dispatcher:
     dp.message.register(cmd_start, Command('start'))
     dp.message.register(on_username, AuthStates.waiting_username)
     dp.message.register(on_password, AuthStates.waiting_password)
+
+    # Voice / button handlerlar — autentifikatsiyalangan foydalanuvchilar uchun
+    register_voice_handlers(dp)
+
+    # Fallback (boshqa har qanday xabar) — autentifikatsiyadan keyin
     dp.message.register(on_authenticated_other, AuthStates.authenticated)
+    dp.message.register(on_authenticated_other)
     return dp
 
 
