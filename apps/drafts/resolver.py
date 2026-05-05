@@ -29,6 +29,7 @@ class ResolveResult:
     """Resolver natijasi."""
     assigned_to: 'User | None' = None
     target_direction: 'Direction | None' = None
+    parent_direction: 'Direction | None' = None
     suggested_participants: list = field(default_factory=list)
     unresolved_names: list[str] = field(default_factory=list)
     # Bot foydalanuvchidan tanlashni so'rashi kerak bo'lgan holatlar
@@ -53,6 +54,15 @@ def resolve_intent(
         ResolveResult — assigned_to, target_direction, suggested_participants va h.k.
     """
     result = ResolveResult()
+
+    # 0. Yuqori turuvchi bo'lim (parent) aytilganmi?
+    parent_dept_name = (intent.get('parent_department') or '').strip()
+    if parent_dept_name:
+        p_direction = _resolve_direction(parent_dept_name)
+        if p_direction:
+            result.parent_direction = p_direction
+        else:
+            result.warnings.append(f'"{parent_dept_name}" — bunday yuqori turuvchi bo\'lim topilmadi')
 
     # 1. Bo'lim aytilganmi?
     target_dept_name = (intent.get('target_department') or '').strip()
