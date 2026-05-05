@@ -164,7 +164,7 @@ CORS_ALLOW_CREDENTIALS = True
 
 # spectacular
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'Smart Assistant API',
+    'TITLE': 'Smart assistant API',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
 }
@@ -207,6 +207,6 @@ UZBEKVOICE_MODEL = config('UZBEKVOICE_MODEL', default='general')
 VOICE_FILE_RETENTION_DAYS = config('VOICE_FILE_RETENTION_DAYS', default=30, cast=int)
 
 # Admin theme tweaks
-ADMIN_SITE_HEADER = 'Smart Assistant — Emergency Admin'
+ADMIN_SITE_HEADER = 'Smart assistant — Emergency Admin'
 ADMIN_SITE_TITLE = 'Emergency Admin'
 ADMIN_INDEX_TITLE = "Faqat superuser uchun. Kundalik ish — dashboard."

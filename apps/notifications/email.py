@@ -12,7 +12,7 @@ from django.core.mail import send_mail
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_SUBJECT = 'Smart Assistant — bildirishnoma'
+DEFAULT_SUBJECT = 'Smart assistant — bildirishnoma'
 
 
 def send_to_many(emails: list[str], text: str, *, subject: str = DEFAULT_SUBJECT) -> int:

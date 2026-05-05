@@ -1,4 +1,4 @@
-# Smart Assistant — Backend
+# Smart assistant — Backend
 
 Django 5 + DRF + simplejwt (cookie auth) + django-mptt + drf-spectacular.
 

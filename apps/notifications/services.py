@@ -201,7 +201,7 @@ class NotificationService:
         if emails:
             try:
                 from .email import send_to_many as send_email_batch
-                send_email_batch(emails, full_sms, subject=f'Smart Assistant: {event.title}')
+                send_email_batch(emails, full_sms, subject=f'Smart assistant: {event.title}')
             except Exception as e:  # noqa: BLE001
                 logger.warning(f'Email batch dispatch xatosi: {e}')
 
@@ -233,7 +233,7 @@ class NotificationService:
         """`POST /api/webpush/test/` — har bir subscription'ga test push."""
         return send_webpush_to_user(
             user.id,
-            title='Smart Assistant — test',
+            title='Smart assistant — test',
             body='Bildirishnomalar to\'g\'ri sozlangan ✅',
             url='/notifications/settings',
             tag='test',
