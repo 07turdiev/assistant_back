@@ -242,17 +242,29 @@ class EventService:
 
 # Kalendar query mantig'i
 def calendar_user_ids(user: User) -> list:
-    """Joriy foydalanuvchi uchun kalendar tarkibi.
+    """Joriy foydalanuvchi uchun kalendar tarkibi (pyramid hierarchy).
 
-    - Agar user'ning chief'i bor (assistant): chief + chief'ning yordamchilari (o'zi ham)
-      barchasi bir kalendar ko'radi
-    - Aks holda — faqat user IDsi
+    Foydalanuvchi ko'radi:
+    - O'zining tadbirlari
+    - Barcha **quyi turuvchilarining** (rekursiv) tadbirlari
+
+    Misol: Vazir → barcha tashkilot xodimlari ko'rinadi.
+            Bo'lim boshlig'i → o'zi va bo'limining barcha xodimlari.
+            Bosh mutaxassis → faqat o'zi (yordamchisi bo'lmasa).
     """
-    if user.chief_id:
-        ids = list(User.objects.filter(chief_id=user.chief_id).values_list('id', flat=True))
-        ids.append(user.chief_id)
-        return ids
-    return [user.id]
+    ids = {user.id}
+    frontier = {user.id}
+    # BFS — har qadamda yangi level subordinate'larni topib qo'shamiz
+    while frontier:
+        subs = set(
+            User.objects.filter(chief_id__in=frontier, enabled=True).values_list('id', flat=True),
+        )
+        new_ids = subs - ids
+        if not new_ids:
+            break
+        ids.update(new_ids)
+        frontier = new_ids
+    return list(ids)
 
 
 def calendar_for_vice(vice_id) -> list:

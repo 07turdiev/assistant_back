@@ -3,6 +3,7 @@ import secrets
 import string
 
 from django.contrib.auth import update_session_auth_hash
+from django.db.models import ProtectedError
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
@@ -54,6 +55,45 @@ class UserViewSet(viewsets.ModelViewSet):
         if self.action in ('list', 'retrieve'):
             return UserAdminSerializer if self._is_admin() else UserShortSerializer
         return UserShortSerializer
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        # O'zini-o'zi o'chirishni taqiqlash
+        if request.user.is_authenticated and instance.id == request.user.id:
+            return Response(
+                {
+                    'success': False,
+                    'message': "Siz o'zingizni o'chira olmaysiz.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            instance.delete()
+        except ProtectedError as exc:
+            # FK PROTECT — foydalanuvchi tadbir/topshiriq va h.k. bilan bog'langan
+            blocking = exc.protected_objects
+            event_count = sum(1 for o in blocking if o.__class__.__name__ == 'Event')
+            other_count = len(blocking) - event_count
+
+            parts = []
+            if event_count:
+                parts.append(f'{event_count} ta tadbirda nutq so\'zlovchi')
+            if other_count:
+                parts.append(f'{other_count} ta boshqa yozuvda')
+            reason = ', '.join(parts) or "boshqa yozuvlar bilan"
+
+            return Response(
+                {
+                    'success': False,
+                    'message': (
+                        f"Foydalanuvchini o'chirib bo'lmadi: u {reason} bog'langan.\n"
+                        "Avval bu bog'lanishlarni boshqasiga o'tkazing yoki foydalanuvchini "
+                        "faolsizlantirib qo'ying (\"Faol\" tugmasi orqali)."
+                    ),
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     def get_permissions(self):
         write_actions = {'create', 'update', 'partial_update', 'destroy', 'reset_password',

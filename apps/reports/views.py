@@ -61,15 +61,24 @@ class ReportViewSet(viewsets.GenericViewSet):
     def _is_request_owner(self, user) -> bool:
         return bool(user.role and user.role.name in (RoleName.ASSISTANT, RoleName.ASSISTANT_PREMIER))
 
-    def _tasks_qs(self, user, *, active: bool):
-        """User'ning task'lari — sender YOKI receiver, lekin sender Premier/Head bo'lishi shart.
+    def _visible_user_ids(self, user) -> set:
+        """User va uning barcha quyi turuvchilari (rekursiv) ID'lari.
 
-        Bir HEAD bir vaqtda Premier'dan task oladi va o'z yordamchilariga yuboradi —
-        bitta "Tasks" sahifa ikkalasini ko'rsatadi.
+        Vazir → barcha xodimlar; bo'lim boshlig'i → o'zi va bo'lim ichidagilar; va h.k.
+        """
+        from apps.events.services import calendar_user_ids
+        return set(calendar_user_ids(user))
+
+    def _tasks_qs(self, user, *, active: bool):
+        """User'ning task'lari — o'zi YOKI quyi turuvchilari ishtirok etgan tasklar.
+
+        Sender Premier/Head bo'lishi shart (task'ning roli).
+        Vazirga butun tashkilot bo'yicha topshiriqlar ko'rinadi.
         """
         task_sender_roles = (RoleName.PREMIER_MINISTER, RoleName.HEAD)
+        visible = self._visible_user_ids(user)
         qs = Report.objects.filter(
-            Q(sender=user) | Q(receiver=user),
+            Q(sender_id__in=visible) | Q(receiver_id__in=visible),
             sender__role__name__in=task_sender_roles,
         )
         if active:
@@ -79,10 +88,14 @@ class ReportViewSet(viewsets.GenericViewSet):
         return qs.select_related('sender', 'receiver', 'sender__role', 'receiver__role')
 
     def _requests_qs(self, user, *, active: bool):
-        """Request'lar — sender YOKI receiver, sender Assistant/AssistantPremier bo'lishi shart."""
+        """Request'lar — o'zi YOKI quyi turuvchilari ishtirok etgan so'rovlar.
+
+        Sender Assistant/AssistantPremier bo'lishi shart.
+        """
         request_sender_roles = (RoleName.ASSISTANT, RoleName.ASSISTANT_PREMIER)
+        visible = self._visible_user_ids(user)
         qs = Report.objects.filter(
-            Q(sender=user) | Q(receiver=user),
+            Q(sender_id__in=visible) | Q(receiver_id__in=visible),
             sender__role__name__in=request_sender_roles,
         )
         if active:
