@@ -11,7 +11,7 @@ class RegionSerializer(serializers.ModelSerializer):
 
 class DistrictSerializer(serializers.ModelSerializer):
     region_id = serializers.PrimaryKeyRelatedField(
-        queryset=Region.objects.all(), source='region', write_only=True,
+        queryset=Region.objects.all(), source='region',
     )
 
     class Meta:
@@ -22,10 +22,10 @@ class DistrictSerializer(serializers.ModelSerializer):
 
 class OrganisationSerializer(serializers.ModelSerializer):
     district_id = serializers.PrimaryKeyRelatedField(
-        queryset=District.objects.all(), source='district', write_only=True, required=False, allow_null=True,
+        queryset=District.objects.all(), source='district', required=False, allow_null=True,
     )
     parent_id = serializers.PrimaryKeyRelatedField(
-        queryset=Organisation.objects.all(), source='parent', write_only=True,
+        queryset=Organisation.objects.all(), source='parent',
         required=False, allow_null=True,
     )
 

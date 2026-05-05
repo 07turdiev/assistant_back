@@ -7,10 +7,10 @@ from .models import Direction
 
 class DirectionSerializer(serializers.ModelSerializer):
     organisation_id = serializers.PrimaryKeyRelatedField(
-        queryset=Organisation.objects.all(), source='organisation', write_only=True,
+        queryset=Organisation.objects.all(), source='organisation',
     )
     parent_id = serializers.PrimaryKeyRelatedField(
-        queryset=Direction.objects.all(), source='parent', write_only=True,
+        queryset=Direction.objects.all(), source='parent',
         required=False, allow_null=True,
     )
 
