@@ -161,7 +161,7 @@ async def on_button_help(message: Message):
         'ℹ️ Yordamchi\n\n'
         '🎤 Topshiriq berish — ovozli xabar yuborib tezkor topshiriq bering\n'
         '📅 Tadbir yaratish — ovoz orqali tadbir qoralamasini tayyorlang\n\n'
-        'Qoralamalar saytda tahrir qilinadi: assistant.madaniyat.uz/drafts',
+        f'Qoralamalar saytda tahrir qilinadi: {settings.FRONTEND_BASE_URL}/drafts',
         reply_markup=main_reply_keyboard(),
     )
 
@@ -311,7 +311,7 @@ async def _notify_assignee(bot: Bot, draft, draft_kind: str, transcript: str):
         f'{icon} *{sender_name}* sizga yangi {kind_uz} qoralamasi yubordi:\n\n'
         f'«{transcript}»\n\n'
         f'Saytda ko\'rib, tahrir qilib, joylashtirishingiz mumkin:\n'
-        f'assistant.madaniyat.uz/drafts/{draft_kind}/{draft.id}'
+        f'{settings.FRONTEND_BASE_URL}/drafts/{draft_kind}/{draft.id}'
     )
     await bot.send_message(
         chat_id=draft.assigned_to.telegram_id,
@@ -329,7 +329,7 @@ async def on_draft_callback(callback: CallbackQuery):
         _, kind, draft_id = data.split(':', 2)
         await callback.answer('Saytda oching')
         await callback.message.answer(
-            f'Saytda tahrir qiling: assistant.madaniyat.uz/drafts/{kind}/{draft_id}',
+            f'Saytda tahrir qiling: {settings.FRONTEND_BASE_URL}/drafts/{kind}/{draft_id}',
             reply_markup=main_reply_keyboard(),
         )
     elif data.startswith('draft_cancel:'):

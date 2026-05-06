@@ -112,7 +112,7 @@ async def on_password(message: Message, state: FSMContext):
         "Pastdagi tugmalardan foydalaning yoki ovozli xabar yuboring:\n"
         "🎤 Topshiriq berish — ovozli buyruq orqali topshiriq qoralamasini yarating\n"
         "📅 Tadbir yaratish — ovoz orqali tadbir qoralamasini tayyorlang\n\n"
-        "Saytdagi to'liq ko'rinish: assistant.madaniyat.uz",
+        f"Saytdagi to'liq ko'rinish: {settings.FRONTEND_BASE_URL}",
         reply_markup=main_reply_keyboard(),
     )
 

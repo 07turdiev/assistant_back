@@ -180,6 +180,12 @@ TG_BOT_USERNAME = config('TG_BOT_USERNAME', default='')
 # Server ishga tushganda bot ham avtomatik daemon thread'da ishga tushadimi
 TG_BOT_AUTOSTART = config('TG_BOT_AUTOSTART', default=False, cast=bool)
 
+# Frontend domeni — bot xabarlari va email link'larida ishlatiladi.
+# Telegram clienti avtomatik link sifatida ochishi uchun protokol (https://) bilan kiriting.
+FRONTEND_BASE_URL = config(
+    'FRONTEND_BASE_URL', default='https://assistant.madaniyat.uz',
+).rstrip('/')
+
 # SMS provider (production: 91.204.239.44/broker-api/send)
 SMS_API_URL = config('SMS_API_URL', default='')
 SMS_API_LOGIN = config('SMS_API_LOGIN', default='')
