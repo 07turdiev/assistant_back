@@ -58,10 +58,12 @@ class OllamaClient:
             'model': self.model,
             'messages': [
                 {'role': 'system', 'content': system},
-                {'role': 'user', 'content': user},
+                {'role': 'user', 'content': f'{user}\n\n/no_think'},
             ],
             'format': 'json',
             'stream': False,
+            # qwen3 reasoning rejimini o'chirish — CPU'da 5-10x tezlashtiradi.
+            'think': False,
             # `keep_alive` — modelni xotirada nechta vaqt ushlab turish.
             # Productionda 30 daqiqa, sovuq start xarajatini sezilarli kamaytiradi.
             'keep_alive': '30m',
