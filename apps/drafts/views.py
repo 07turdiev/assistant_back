@@ -45,10 +45,15 @@ class _DraftViewSetBase(
 
     def get_queryset(self):
         user = self.request.user
-        # Foydalanuvchi yaratgan VA unga tayinlangan qoralamalar
-        return self.queryset_model.objects.filter(
-            Q(created_by=user) | Q(assigned_to=user)
-        ).select_related('created_by', 'assigned_to', 'target_direction').distinct()
+        qs = self.queryset_model.objects.select_related(
+            'created_by', 'assigned_to', 'target_direction',
+        )
+        # SUPER_ADMIN, ADMIN va Django superuser hammasini ko'radi (debug/yordam uchun)
+        role_name = getattr(getattr(user, 'role', None), 'name', None)
+        if user.is_superuser or role_name in ('SUPER_ADMIN', 'ADMIN'):
+            return qs.distinct()
+        # Qolganlar — faqat o'zlari yaratgan yoki o'zlariga tayinlangan qoralamalar
+        return qs.filter(Q(created_by=user) | Q(assigned_to=user)).distinct()
 
 
 class EventDraftViewSet(_DraftViewSetBase):
