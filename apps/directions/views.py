@@ -34,9 +34,17 @@ class DirectionViewSet(viewsets.ModelViewSet):
         try:
             return super().destroy(request, *args, **kwargs)
         except ProtectedError as e:
+            protected_count = len(e.protected_objects) if hasattr(e, 'protected_objects') else 0
             return Response(
-                {'detail': f'Cannot delete direction: {str(e)}'},
-                status=status.HTTP_400_BAD_REQUEST
+                {
+                    'detail': (
+                        "Yo'nalishni o'chirib bo'lmaydi: unga biriktirilgan "
+                        f"{protected_count} ta yozuv mavjud. Avval foydalanuvchilarni "
+                        "boshqa yo'nalishga o'tkazing."
+                    ),
+                    'protected_count': protected_count,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
     @action(detail=False, methods=['get'])
