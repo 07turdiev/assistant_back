@@ -34,7 +34,7 @@ class OllamaClient:
         self,
         base_url: str | None = None,
         model: str | None = None,
-        timeout: float = 180.0,
+        timeout: float = 600.0,
     ):
         self.base_url = (base_url or getattr(settings, 'OLLAMA_URL', 'http://localhost:11434')).rstrip('/')
         self.model = model or getattr(settings, 'OLLAMA_MODEL', 'qwen3:14b')
