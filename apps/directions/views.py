@@ -1,7 +1,8 @@
-from rest_framework import filters, viewsets
+from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from django.db.models import ProtectedError
 
 from apps.core.permissions import IsAdminRole
 
@@ -28,6 +29,15 @@ class DirectionViewSet(viewsets.ModelViewSet):
         if self.action in ('list', 'retrieve', 'tree'):
             return [IsAuthenticated()]
         return [IsAuthenticated(), IsAdminRole()]
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            return super().destroy(request, *args, **kwargs)
+        except ProtectedError as e:
+            return Response(
+                {'detail': f'Cannot delete direction: {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
     @action(detail=False, methods=['get'])
     def tree(self, request):

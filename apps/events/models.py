@@ -37,7 +37,7 @@ class Event(AuditMixin):
 
     direction = models.ForeignKey(
         'directions.Direction',
-        on_delete=models.PROTECT,
+        on_delete=models.CASCADE,
         related_name='events',
     )
     speaker = models.ForeignKey(
