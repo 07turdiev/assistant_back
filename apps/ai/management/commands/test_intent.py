@@ -102,12 +102,15 @@ class Command(BaseCommand):
         self.stdout.write(self.style.HTTP_INFO(f'Matn: {text}'))
         start = time.monotonic()
         try:
-            result = parse_intent(text)
+            result, warnings = parse_intent(text)
         except OllamaError as e:
             self.stdout.write(self.style.ERROR(f'XATO: {e}'))
             return
         elapsed = time.monotonic() - start
         self.stdout.write(f'Vaqt: {elapsed:.2f}s')
+        if warnings:
+            for w in warnings:
+                self.stdout.write(self.style.WARNING(f'OGOH: {w}'))
         self.stdout.write(json.dumps(result, ensure_ascii=False, indent=2))
 
     def _run_case(self, case: dict, *, today: date, verbose: bool) -> tuple[bool, float]:
@@ -118,7 +121,7 @@ class Command(BaseCommand):
 
         start = time.monotonic()
         try:
-            actual = parse_intent(text, today=today)
+            actual, _warnings = parse_intent(text, today=today)
         except (OllamaError, ValueError) as e:
             elapsed = time.monotonic() - start
             self.stdout.write(self.style.ERROR(f'#{case_id} [{category}] CRASH: {e}'))

@@ -37,6 +37,7 @@ class ScheduledTask(models.Model):
 
     # Tegishli obyekt ID'lari (bare UUID — FK yo'q, audit uchun)
     event_id = models.UUIDField(null=True, blank=True)
+    report_id = models.UUIDField(null=True, blank=True)
     user_id = models.UUIDField(null=True, blank=True)
     notify_time = models.IntegerField(null=True, blank=True)  # minut
 

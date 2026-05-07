@@ -33,20 +33,22 @@ def parse_intent(
     *,
     today: date | None = None,
     client: OllamaClient | None = None,
-) -> dict[str, Any]:
-    """Foydalanuvchi matnini tahlil qilib, strukturalangan dict qaytaradi.
+    intent_type_hint: str | None = None,
+) -> tuple[dict[str, Any], list[str]]:
+    """Foydalanuvchi matnini tahlil qilib, strukturalangan dict + ogohlantirishlar qaytaradi.
+
+    Agar Ollama yiqilsa yoki javobi noto'g'ri bo'lsa — best-effort fallback ishga tushadi:
+    bo'sh draft yaratiladi, foydalanuvchi saytda qo'lda to'ldirib joylash mumkin.
+    Warning ro'yxati `[2]` element sifatida qaytadi va summary'da ko'rsatiladi.
 
     Args:
         text: foydalanuvchi yuborgan o'zbekcha matn (STT natijasi)
         today: hisob asoslangan sana (default: bugungi)
         client: Ollama klient (default: yangi yaratiladi)
-
-    Raises:
-        OllamaError: model yetishilmagan yoki noto'g'ri javob qaytargan bo'lsa
-        ValueError: javobda zarur maydonlar yo'q bo'lsa
+        intent_type_hint: 'event' yoki 'task' (Telegram tugmasidan kelgan ipucu)
 
     Returns:
-        type, title, date, start_time va boshqa maydonlardan iborat dict.
+        (intent_dict, warnings) — intent doimo qaytadi (fallback bo'lsa ham).
     """
     if not text or not text.strip():
         raise ValueError('Bo\'sh matn berildi')
@@ -55,8 +57,42 @@ def parse_intent(
     system_prompt = build_intent_system_prompt(today=today)
 
     logger.debug('Intent parser chaqirilmoqda: %s', text[:200])
-    raw = client.chat_json(system=system_prompt, user=text.strip())
-    return _normalize(raw)
+    try:
+        raw = client.chat_json(system=system_prompt, user=text.strip())
+        intent = _normalize(raw)
+        return intent, []
+    except (OllamaError, ValueError) as e:
+        logger.warning('AI parser yiqildi, fallback ishlatilmoqda: %s', e)
+        fallback = _build_fallback(text, intent_type_hint)
+        warnings = [
+            'AI tahlilchi javob bermadi — bo\'sh qoralama yaratildi. '
+            'Saytda barcha maydonlarni qo\'lda to\'ldiring.',
+        ]
+        return fallback, warnings
+
+
+def _build_fallback(text: str, intent_type_hint: str | None) -> dict[str, Any]:
+    """AI ishlamasa — foydalanuvchi matnini sarlavha sifatida bo'sh draft yaratadi."""
+    intent_type = 'event' if intent_type_hint == 'event' else 'report'
+    # Sarlavha sifatida birinchi 80 ta belgini olamiz, qolgani — description
+    title = text.strip()
+    if len(title) > 80:
+        title = title[:77] + '...'
+    return {
+        'type': intent_type,
+        'title': title or 'Sarlavhasiz',
+        'description': text.strip(),
+        'date': None,
+        'start_time': None,
+        'end_time': None,
+        'duration_minutes': None,
+        'location': None,
+        'is_important': False,
+        'is_private': False,
+        'target_department': None,
+        'mentioned_participants': [],
+        'notify_minutes_before': _default_notifies(intent_type),
+    }
 
 
 def _normalize(raw: dict[str, Any]) -> dict[str, Any]:

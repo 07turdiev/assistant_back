@@ -199,10 +199,24 @@ class ReportService:
             if notify_time <= 0:
                 raise ValidationError({'notify_time': "Musbat son bo'lishi kerak"})
             report.notify_time = notify_time
-            # TODO: Schedule reminder (Celery beat / APScheduler) — Bosqich 3'da
 
         report.seen = True
         report.save()
+
+        # Eslatmani rejalashtirish — notify_time bo'lsa va hali javob berilmagan bo'lsa
+        if notify_time is not None and not reply:
+            try:
+                from apps.scheduler.services import schedule_report_followup
+                schedule_report_followup(report, notify_time)
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f'Report followup rejalashtirish xatosi: {e}')
+        # Final reply kelgan bo'lsa — kutayotgan eslatmani bekor qilamiz
+        elif reply:
+            try:
+                from apps.scheduler.services import cancel_report_followups
+                cancel_report_followups(report.id)
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f'Report followup bekor qilish xatosi: {e}')
 
         # Sender'ga javob keldi push
         is_task = _is_task_sender(report.sender) if report.sender else False

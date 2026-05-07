@@ -29,6 +29,8 @@ from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.core.files.base import ContentFile
 
+from .i18n import detect_lang, t
+
 from .keyboards import (
     BTN_HELP,
     BTN_NEW_EVENT,
@@ -74,7 +76,11 @@ def _create_draft_pipeline(
         create_report_draft_from_intent,
     )
 
-    intent = parse_intent(raw_text, today=date_cls.today())
+    intent, ai_warnings = parse_intent(
+        raw_text,
+        today=date_cls.today(),
+        intent_type_hint=intent_type_hint,
+    )
 
     # Tugma orqali kelgan tur (event/task) ustun — model adashsa ham
     if intent_type_hint == 'event':
@@ -109,7 +115,7 @@ def _create_draft_pipeline(
             voice_file=voice_file,
         )
 
-    return draft, intent, resolved.warnings
+    return draft, intent, [*ai_warnings, *resolved.warnings]
 
 
 @sync_to_async
@@ -132,66 +138,66 @@ def _format_assignee_name(user) -> str:
 
 # --------- Handlers ---------
 
+def _lang(message: Message):
+    code = getattr(message.from_user, 'language_code', None) if message.from_user else None
+    return detect_lang(code)
+
+
 async def on_button_new_task(message: Message, state: FSMContext):
+    lang = _lang(message)
     user = await _get_user(message.chat.id)
     if not user:
-        await message.answer('Iltimos, avval /start orqali tizimga kiring.')
+        await message.answer(t('voice.need_login', lang=lang))
         return
     await state.set_state(VoiceStates.waiting_voice_for_task)
-    await message.answer(
-        '🎤 Topshiriq matnini ovozli xabar shaklida yuboring.\n\n'
-        'Misol: "Sherzodga ayting, Toshkent viloyati hisobotini juma kuniga tayyorlasin"'
-    )
+    await message.answer(t('voice.send_for_task', lang=lang))
 
 
 async def on_button_new_event(message: Message, state: FSMContext):
+    lang = _lang(message)
     user = await _get_user(message.chat.id)
     if not user:
-        await message.answer('Iltimos, avval /start orqali tizimga kiring.')
+        await message.answer(t('voice.need_login', lang=lang))
         return
     await state.set_state(VoiceStates.waiting_voice_for_event)
-    await message.answer(
-        '🎤 Tadbir tafsilotlarini ovozli xabar shaklida yuboring.\n\n'
-        'Misol: "Ertaga soat 14 da Senat zalida kollegiya yig\'ilishi, 90 daqiqa"'
-    )
+    await message.answer(t('voice.send_for_event', lang=lang))
 
 
 async def on_button_help(message: Message):
+    lang = _lang(message)
     await message.answer(
-        'ℹ️ Yordamchi\n\n'
-        '🎤 Topshiriq berish — ovozli xabar yuborib tezkor topshiriq bering\n'
-        '📅 Tadbir yaratish — ovoz orqali tadbir qoralamasini tayyorlang\n\n'
-        f'Qoralamalar saytda tahrir qilinadi: {settings.FRONTEND_BASE_URL}/drafts',
+        t('voice.help', lang=lang, url=settings.FRONTEND_BASE_URL),
         reply_markup=main_reply_keyboard(),
     )
 
 
 async def on_voice_message(message: Message, state: FSMContext, bot: Bot):
     """Foydalanuvchi ovoz yuborgan holat — agar `waiting_voice_for_*` state'da bo'lsa."""
+    lang = _lang(message)
     current_state = await state.get_state()
     if current_state not in (
         VoiceStates.waiting_voice_for_event.state,
         VoiceStates.waiting_voice_for_task.state,
     ):
         await message.answer(
-            'ℹ️ Ovozli xabar qabul qilish uchun avval pastdagi tugmalardan birini bosing.',
+            t('voice.button_first', lang=lang),
             reply_markup=main_reply_keyboard(),
         )
         return
 
     user = await _get_user(message.chat.id)
     if not user:
-        await message.answer('Iltimos, avval /start orqali tizimga kiring.')
+        await message.answer(t('voice.need_login', lang=lang))
         return
 
     intent_hint = 'event' if current_state == VoiceStates.waiting_voice_for_event.state else 'task'
 
     voice = message.voice or message.audio
     if not voice:
-        await message.answer('Iltimos, ovozli xabar yuboring.')
+        await message.answer(t('voice.send_voice', lang=lang))
         return
 
-    progress = await message.answer('⏳ Ovoz yuklanmoqda va matnga aylantirilmoqda...')
+    progress = await message.answer(t('voice.processing', lang=lang))
 
     try:
         # 1. Telegram'dan ovozni yuklab olish
@@ -204,13 +210,14 @@ async def on_voice_message(message: Message, state: FSMContext, bot: Bot):
         # 2. STT
         transcript = await _stt_transcribe(voice_bytes, voice_filename)
         if not transcript:
-            await progress.edit_text('❌ Matn aniqlanmadi. Iltimos, qayta urinib ko\'ring.')
+            await progress.edit_text(t('voice.transcribe_failed', lang=lang))
             await state.clear()
             return
 
-        await progress.edit_text(f'📝 Matn:\n«{transcript}»\n\n🤖 AI tahlil qilmoqda...')
+        await progress.edit_text(t('voice.analyzing', lang=lang, text=transcript))
 
-        # 3. AI + Draft
+        # 3. AI + Draft (Ollama down, JSON parse xatosi va boshqa AI muammolari
+        # to'g'ridan-to'g'ri shu yerga ko'tariladi — pastda fallback bor)
         draft, intent, warnings = await _create_draft_pipeline(
             sender=user,
             raw_text=transcript,
@@ -221,9 +228,7 @@ async def on_voice_message(message: Message, state: FSMContext, bot: Bot):
 
     except Exception as e:
         logger.exception('Ovoz pipeline xatosi: %s', e)
-        await progress.edit_text(
-            f'❌ Xato yuz berdi: {e}\n\nIltimos, qayta urinib ko\'ring yoki saytda qo\'lda yarating.'
-        )
+        await progress.edit_text(t('voice.pipeline_error', lang=lang))
         await state.clear()
         return
 
@@ -324,19 +329,23 @@ async def _notify_assignee(bot: Bot, draft, draft_kind: str, transcript: str):
 
 async def on_draft_callback(callback: CallbackQuery):
     """Tasdiq tugmasi (qoralamani saytda ochish) yoki bekor qilish."""
+    lang = detect_lang(
+        getattr(callback.from_user, 'language_code', None) if callback.from_user else None,
+    )
     data = callback.data or ''
     if data.startswith('draft_open:'):
         _, kind, draft_id = data.split(':', 2)
-        await callback.answer('Saytda oching')
+        await callback.answer(t('draft.open_on_site', lang=lang))
+        url = f'{settings.FRONTEND_BASE_URL}/drafts/{kind}/{draft_id}'
         await callback.message.answer(
-            f'Saytda tahrir qiling: {settings.FRONTEND_BASE_URL}/drafts/{kind}/{draft_id}',
+            t('draft.edit_on_site', lang=lang, url=url),
             reply_markup=main_reply_keyboard(),
         )
     elif data.startswith('draft_cancel:'):
         _, kind, draft_id = data.split(':', 2)
         await _reject_draft_async(kind, draft_id, reason='Telegram orqali bekor qilindi')
-        await callback.answer('Qoralama bekor qilindi')
-        await callback.message.edit_text('🛑 Qoralama bekor qilindi.')
+        await callback.answer(t('draft.cancelled_short', lang=lang))
+        await callback.message.edit_text(t('draft.cancelled', lang=lang))
 
 
 @sync_to_async

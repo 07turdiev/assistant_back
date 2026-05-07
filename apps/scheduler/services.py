@@ -64,17 +64,33 @@ def cancel_event_reminders(event_id) -> int:
 
 
 def schedule_report_followup(report, notify_time_min: int) -> Optional[ScheduledTask]:
-    """Hisobotga `notify_time` minutdan keyin eslatma."""
+    """Hisobotga `notify_time` minutdan keyin eslatma — sender'ga.
+
+    Receiver javob bermay turib, `notify_time` minutdan so'ng eslatish kerak bo'lganda.
+    Eslatma sender'ga ham, receiver'ga ham yuboriladi (executor ichida).
+    """
     if notify_time_min <= 0:
         return None
+    # Avvalgi pending followup'larni bekor qilamiz (qaytatdan reply bo'lsa)
+    cancel_report_followups(report.id)
     run_at = timezone.now() + timedelta(minutes=notify_time_min)
     return ScheduledTask.objects.create(
         kind=ScheduledTaskKind.REPORT_FOLLOWUP,
-        event_id=None,
-        user_id=report.sender_id,  # eslatma sender'ga ketadi
+        report_id=report.id,
+        user_id=report.sender_id,
         notify_time=notify_time_min,
         run_at=run_at,
     )
+
+
+def cancel_report_followups(report_id) -> int:
+    """Hisobotga oid bajarilmagan eslatmalarni bekor qiladi (yangi reply kelganda)."""
+    deleted, _ = ScheduledTask.objects.filter(
+        kind=ScheduledTaskKind.REPORT_FOLLOWUP,
+        report_id=report_id,
+        executed=False,
+    ).delete()
+    return deleted
 
 
 # --- Execution ---
@@ -158,5 +174,60 @@ def _execute_event_reminder(task: ScheduledTask) -> None:
 
 
 def _execute_report_followup(task: ScheduledTask) -> None:
-    # TODO: Reports'da reply'da notify_time bo'lsa, sender'ga eslatma yuborish
-    logger.info(f'Report followup task {task.id} — placeholder')
+    """Hisobot bo'yicha eslatma — receiver hali javob bermagan bo'lsa,
+    sender va receiver'ga eslatish (WS push + Telegram)."""
+    from asgiref.sync import async_to_sync
+    from channels.layers import get_channel_layer
+
+    from apps.reports.models import Report
+
+    if not task.report_id:
+        return
+    try:
+        report = Report.objects.select_related('sender', 'receiver').get(pk=task.report_id)
+    except Report.DoesNotExist:
+        logger.info(f'Report {task.report_id} topilmadi — followup bekor')
+        return
+
+    # Agar receiver allaqachon javob bergan bo'lsa — eslatish shart emas
+    if report.reply:
+        logger.info(f'Report {report.id} allaqachon javoblangan — followup o\'tkazib yuborildi')
+        return
+
+    text = (
+        f'⏰ Eslatma: «{report.description[:120]}» bo\'yicha javob hali kelmadi '
+        f'({task.notify_time} daq. oldin so\'rov yuborilgan).'
+    )
+
+    layer = get_channel_layer()
+
+    def _ws_push(user_id):
+        if layer is None or not user_id:
+            return
+        try:
+            async_to_sync(layer.group_send)(f'report_{user_id}', {
+                'type': 'report.message',
+                'payload': {
+                    'channel': 'report',
+                    'type': 'Reminder',
+                    'message': text,
+                    'report_id': str(report.id),
+                },
+            })
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f'WS reminder push xatosi (user={user_id}): {e}')
+
+    # Sender va receiver'ga ikkalasiga ham
+    _ws_push(report.sender_id)
+    _ws_push(report.receiver_id)
+
+    # Telegram orqali receiver'ga ham xabar
+    receiver = report.receiver
+    if receiver and receiver.telegram_id:
+        try:
+            from apps.telegram_bot.notify import send_message as send_tg
+            send_tg(receiver.telegram_id, text)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f'TG reminder xatosi: {e}')
+
+    logger.info(f'Report {report.id} followup yuborildi (sender={report.sender_id}, receiver={report.receiver_id})')
