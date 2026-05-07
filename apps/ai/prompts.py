@@ -87,12 +87,19 @@ QOIDALAR:
    - "bugun" → jadvaldagi 'bugun' qatori
    - "ertaga" → jadvaldagi 'ertaga' qatori
    - "indinga" → jadvaldagi 'indinga' qatori
-   - "juma kuni", "payshanba kuni" va h.k. → jadvalda o'sha hafta kuni qatorini topib oladi
-   - "keyingi dushanba" → jadvalda KEYINGI dushanba qatorini olasan (2 hafta ichidagi 2-chi dushanba EMAS, \
-     balki bugundan keyin keladigan eng yaqin dushanba)
+   - "juma kuni", "payshanba kuni" va h.k. → jadvalda BIRINCHI uchragan o'sha hafta kuni qatorini olasan
+   - "keyingi dushanba", "keyingi juma" va h.k. → bu IBORADA "keyingi" so'zi "kelayotgan/yaqin" \
+     ma'nosini bildiradi, "ikkinchi haftadagi" EMAS. \
+     Demak jadvalda BIRINCHI uchragan dushanba/juma qatorini olasan. \
+     Misol: agar bugun seshanba bo'lsa, "keyingi dushanba" = jadvaldagi 1-chi dushanba (bugundan 6 kun keyin), \
+     2-chi dushanba (bugundan 13 kun keyin) EMAS.
    - Sanalarni ASLO o'zing arifmetik hisoblamaysan — har doim jadvaldan o'qiysan
-   - Aniq sana berilgan bo'lsa (masalan "12-may") va hafta kuni nomi ham aytilgan bo'lsa, \
-     ANIQ SANA ustun, hafta kuni nomi e'tiborsiz
+   - ANIQ SANA QOIDASI: agar matnda aniq kun raqami bilan oy aytilgan bo'lsa \
+     ("12-may", "5 iyun", "20-iyul" kabi), VA hafta kuni nomi ham aytilgan bo'lsa — \
+     **ANIQ SANA HAR DOIM USTUN**, hafta kuni nomini butunlay E'TIBORSIZ qoldirasan. \
+     Misol: "12-may juma kuni" → faqat "12-may" ni olasan, "juma" so'zi noto'g'ri \
+     bo'lishi mumkin (yoki insonning xatosi) — sen aniq sanani jadvaldan topasan, \
+     hafta kuniga qaramaysan.
 
 3. VAQT — 24-soat formatida:
    - "soat 14" → "14:00"
@@ -105,11 +112,16 @@ QOIDALAR:
 4. DAVOMIYLIK: agar `duration_minutes` aytilsa va `start_time` bor bo'lsa, \
    `end_time` = `start_time` + `duration_minutes`. "1 soat" = 60, "2 soat" = 120, "yarim soat" = 30.
 
-4a. MANZIL (`location`) — kelishik qo'shimchalarini olib tashla:
+4a. MANZIL (`location`) — FAQAT kelishik qo'shimchasini olib tashla, atributlarni SAQLA:
+   - "-da", "-dagi", "-ga", "-ning" kabi kelishik affikslarini olib tashla
+   - Atributlar (sifatlar, qo'shma ot qismlari) HAR DOIM SAQLANADI — ularni hech qachon tashlamaysan!
    - "Senat zalida" → "Senat zali"
    - "konferens-zalda" → "konferens-zal"
-   - "muzeyida" → "muzey", "mehmonxonasida" → "mehmonxona"
-   - Atrofli ot ko'rinishida qaytar (ot+egalik holati)
+   - "Xalq do'stligi muzeyida" → "Xalq do'stligi muzeyi" (atribut "Xalq do'stligi" SAQLANGAN)
+   - "Mustaqillik mehmonxonasida" → "Mustaqillik mehmonxonasi" (atribut SAQLANGAN)
+   - "Hokimlikda" → "Hokimlik"
+   - YOMON: "Xalq do'stligi muzeyida" → "muzey" (atributlar tushib qolgan — XATO!)
+   - YAXSHI: To'liq nominativ shaklda qaytarish — atribut + bosh ot + egalik affiksi
 
 5. ISHTIROKCHILAR (`mentioned_participants`):
    - Faqat ISM (yoki ism+familiya) qaytar. "aka", "opa", "domla", "uka" kabi murojaatlarni TASHLAB YUBOR.
@@ -152,5 +164,14 @@ Foydalanuvchi: "Yordamchimga ayting bugun choyxonadagi tushlik uchrashuvini beko
 
 Foydalanuvchi: "Indinga ertalab soat 10 da yopiq prezidium, ishtirokchilar Bekzod va Dilshod"
 {{"type":"event","title":"Yopiq prezidium","description":null,"date":"{_add(today, 2)}","start_time":"10:00","end_time":null,"duration_minutes":null,"location":null,"is_important":false,"is_private":true,"target_department":null,"mentioned_participants":["Bekzod","Dilshod"],"notify_minutes_before":[60,1440]}}
+
+Foydalanuvchi: "Chorshanba kuni 15 00 da kichik majlis, qatnashadi Olim, Salim va Karim, Xalq do'stligi muzeyida"
+# DIQQAT: "Xalq do'stligi muzeyida" → "Xalq do'stligi muzeyi" (atribut SAQLANGAN)
+{{"type":"event","title":"Kichik majlis","description":null,"date":null,"start_time":"15:00","end_time":null,"duration_minutes":null,"location":"Xalq do'stligi muzeyi","is_important":false,"is_private":false,"target_department":null,"mentioned_participants":["Olim","Salim","Karim"],"notify_minutes_before":[60,1440]}}
+
+Foydalanuvchi: "12-may juma kuni 10 30 da prezidium, davomiyligi 2 soat"
+# DIQQAT: aniq sana "12-may" berilgan, "juma" so'zi e'tiborsiz qoldiriladi.
+# Sana jadvaldan FAQAT 12-may qator orqali topiladi (hafta kuni qaramay).
+{{"type":"event","title":"Prezidium","description":null,"date":"2026-05-12","start_time":"10:30","end_time":"12:30","duration_minutes":120,"location":null,"is_important":false,"is_private":false,"target_department":null,"mentioned_participants":[],"notify_minutes_before":[60,1440]}}
 """
 
