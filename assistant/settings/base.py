@@ -186,6 +186,10 @@ FRONTEND_BASE_URL = config(
     'FRONTEND_BASE_URL', default='https://assistant.madaniyat.uz',
 ).rstrip('/')
 
+# Chat: yangi xabar yuborilganda receiver Telegram bot orqali ham bildirishnoma oladi.
+# Yopib qo'yish uchun env'da `CHAT_TELEGRAM_NOTIFY=False` qiling.
+CHAT_TELEGRAM_NOTIFY = config('CHAT_TELEGRAM_NOTIFY', default=True, cast=bool)
+
 # SMS provider (production: 91.204.239.44/broker-api/send)
 SMS_API_URL = config('SMS_API_URL', default='')
 SMS_API_LOGIN = config('SMS_API_LOGIN', default='')

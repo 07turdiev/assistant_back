@@ -5,10 +5,12 @@ Production behavior:
 - GET /api/chat?receiverId — sahifali tarix (ikkalasi orasidagi xabarlar)
 - GET /api/chat/count — o'qilmaganlar soni (sender bo'yicha guruhlangan)
 """
+import html
 import logging
 
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
+from django.conf import settings
 from django.db import transaction
 from django.db.models import Count, Q
 
@@ -69,11 +71,13 @@ class ChatService:
             'created_at': msg.created_at.isoformat(),
         })
 
+        # Sender ism va xabar previewi — web push va telegram'da ishlatiladi
+        sender_name = ' '.join(filter(None, [sender.last_name, sender.first_name])).strip() \
+            or sender.username
+        preview = (msg.message or ('📎 Fayl' if files else '')).strip()[:140]
+
         # Web Push (tab yopiq/blur bo'lganda OS bildirishnomasi)
         try:
-            sender_name = ' '.join(filter(None, [sender.last_name, sender.first_name])).strip() \
-                or sender.username
-            preview = (msg.message or ('📎 Fayl' if files else '')).strip()[:140]
             send_webpush_to_user(
                 receiver.id,
                 title=sender_name,
@@ -84,6 +88,30 @@ class ChatService:
             )
         except Exception as e:  # noqa: BLE001
             logger.warning(f'Chat web push xatosi: {e}')
+
+        # Telegram bildirishnoma — receiver botga ulangan bo'lsa
+        # `CHAT_TELEGRAM_NOTIFY=False` qilib settings'da o'chirib qo'yish mumkin
+        if (
+            getattr(settings, 'CHAT_TELEGRAM_NOTIFY', True)
+            and receiver.telegram_id
+        ):
+            try:
+                from apps.telegram_bot.notify import send_message as send_tg
+                # HTML escape — sender ismi yoki xabar matnida `<`, `>`, `&` bo'lsa
+                safe_sender = html.escape(sender_name)
+                safe_preview = html.escape(preview) if preview else '📎 Fayl'
+                # Saytda ochish uchun chuqurlikdagi link (bot xabarni Markdown'siz yuboradi)
+                deep_link = (
+                    f'{settings.FRONTEND_BASE_URL}/?openChat={sender.id}'
+                    if getattr(settings, 'FRONTEND_BASE_URL', '')
+                    else ''
+                )
+                text = f'💬 <b>{safe_sender}</b>\n\n{safe_preview}'
+                if deep_link:
+                    text += f'\n\n<a href="{deep_link}">Saytda ochish</a>'
+                send_tg(receiver.telegram_id, text, parse_mode='HTML')
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f'Chat TG dispatch xatosi: {e}')
 
         return msg
 
