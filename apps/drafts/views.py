@@ -32,6 +32,18 @@ from .serializers import (
 from .services import publish_event_draft, publish_report_draft, reject_draft
 
 
+def _validation_error_response(e: ValidationError) -> Response:
+    """Django ValidationError'ni DRF standart shaklidagi javobga aylantiradi.
+
+    `str(e)` natijasi xunuk: `["xato matn"]` (bracketlar bilan) ko'rinishida bo'ladi.
+    `e.messages` esa toza ro'yxat qaytaradi. Frontend `extractApiError` `detail`
+    field'ini birinchi navbatda o'qiydi — shu tarzda foydalanuvchiga ravon xabar tushadi.
+    """
+    messages = getattr(e, 'messages', None) or [str(e)]
+    detail = '; '.join(m for m in messages if m)
+    return Response({'detail': detail}, status=status.HTTP_400_BAD_REQUEST)
+
+
 class _DraftViewSetBase(
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
@@ -89,7 +101,7 @@ class EventDraftViewSet(_DraftViewSetBase):
         try:
             event = publish_event_draft(draft)
         except ValidationError as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return _validation_error_response(e)
 
         # Joylangach — yaratilgan Event'ni qaytaramiz
         return Response(
@@ -108,7 +120,7 @@ class EventDraftViewSet(_DraftViewSetBase):
         try:
             reject_draft(draft, reason=serializer.validated_data.get('reason', ''))
         except ValidationError as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return _validation_error_response(e)
         return Response(EventDraftSerializer(draft, context={'request': request}).data)
 
 
@@ -128,7 +140,7 @@ class ReportDraftViewSet(_DraftViewSetBase):
         try:
             report = publish_report_draft(draft)
         except ValidationError as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return _validation_error_response(e)
 
         return Response(
             {
@@ -146,5 +158,5 @@ class ReportDraftViewSet(_DraftViewSetBase):
         try:
             reject_draft(draft, reason=serializer.validated_data.get('reason', ''))
         except ValidationError as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return _validation_error_response(e)
         return Response(ReportDraftSerializer(draft, context={'request': request}).data)
