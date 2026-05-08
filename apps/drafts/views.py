@@ -42,6 +42,8 @@ class _DraftViewSetBase(
     """Faqat shu foydalanuvchiga tegishli qoralamalar (created_by yoki assigned_to)."""
     permission_classes = [IsAuthenticated]
     http_method_names = ['get', 'patch', 'post', 'delete']
+    # Subclass'lar to'ldiradi — update'dan keyin to'liq javob qaytarish uchun
+    read_serializer_class = None
 
     def get_queryset(self):
         user = self.request.user
@@ -55,10 +57,26 @@ class _DraftViewSetBase(
         # Qolganlar — faqat o'zlari yaratgan yoki o'zlariga tayinlangan qoralamalar
         return qs.filter(Q(created_by=user) | Q(assigned_to=user)).distinct()
 
+    def update(self, request, *args, **kwargs):
+        # UpdateSerializer'da `id` va boshqa read-only field'lar yo'q. Frontend
+        # javobni to'g'ridan-to'g'ri draft state'iga yozadi va keyingi publish/reject
+        # chaqiruvlarida `draft.id` ishlatadi — shuning uchun read serializer bilan
+        # to'liq holatni qaytaramiz.
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        write_serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        write_serializer.is_valid(raise_exception=True)
+        self.perform_update(write_serializer)
+        instance.refresh_from_db()
+        return Response(
+            self.read_serializer_class(instance, context={'request': request}).data
+        )
+
 
 class EventDraftViewSet(_DraftViewSetBase):
     queryset_model = EventDraft
     queryset = EventDraft.objects.all()
+    read_serializer_class = EventDraftSerializer
 
     def get_serializer_class(self):
         if self.action in ('partial_update', 'update'):
@@ -97,6 +115,7 @@ class EventDraftViewSet(_DraftViewSetBase):
 class ReportDraftViewSet(_DraftViewSetBase):
     queryset_model = ReportDraft
     queryset = ReportDraft.objects.all()
+    read_serializer_class = ReportDraftSerializer
 
     def get_serializer_class(self):
         if self.action in ('partial_update', 'update'):
