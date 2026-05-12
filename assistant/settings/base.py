@@ -82,12 +82,22 @@ TEMPLATES = [
 WSGI_APPLICATION = 'assistant.wsgi.application'
 ASGI_APPLICATION = 'assistant.asgi.application'
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+# DATABASE_URL env'da bo'lsa (server .env) — undan foydalanamiz, aks holda lokal dev
+# uchun SQLite. Bu manage.py qo'lda chaqirilganda ham, daphne service ishga tushganda
+# ham bir xil DB ga borishni ta'minlaydi (settings module farqi bilan endi yo'q).
+_DATABASE_URL = config('DATABASE_URL', default='')
+if _DATABASE_URL:
+    import dj_database_url
+    DATABASES = {
+        'default': dj_database_url.parse(_DATABASE_URL, conn_max_age=600, conn_health_checks=True),
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 AUTH_USER_MODEL = 'users.User'
 AUTH_PASSWORD_VALIDATORS = [
