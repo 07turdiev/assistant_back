@@ -63,14 +63,17 @@ class ChatService:
                 att.file_chat = msg
                 att.save(update_fields=['file_chat'])
 
-        # WS push receiver ga
-        _send_ws(receiver.id, {
+        # WS push receiver ga — TRANSACTION COMMIT'DAN KEYIN yuboriladi.
+        # Aks holda receiver brauzer push'ni darrov olib history'ni qayta yuklaydi,
+        # lekin transaction commit bo'lmagani sababli yangi habar ko'rinmaydi.
+        ws_payload = {
             'channel': 'chat',
             'from': str(sender.id),
             'message_id': str(msg.id),
             'message': msg.message,
             'created_at': msg.created_at.isoformat(),
-        })
+        }
+        transaction.on_commit(lambda: _send_ws(receiver.id, ws_payload))
 
         # Sender ism va xabar previewi — web push va telegram'da ishlatiladi
         sender_name = ' '.join(filter(None, [sender.last_name, sender.first_name])).strip() \
@@ -204,8 +207,15 @@ class ChatService:
             'sender_id': str(message.sender_id),
             'receiver_id': str(message.receiver_id),
         }
-        _send_ws(message.sender_id, payload)
-        _send_ws(message.receiver_id, payload)
+        # Commit'dan keyin push — receiver brauzer history fetch qilsa
+        # is_deleted=True ni ko'radi (uncommitted state'da ko'rmas edi).
+        sender_id_local = message.sender_id
+        receiver_id_local = message.receiver_id
+
+        def _broadcast():
+            _send_ws(sender_id_local, payload)
+            _send_ws(receiver_id_local, payload)
+        transaction.on_commit(_broadcast)
         return message
 
     @staticmethod
