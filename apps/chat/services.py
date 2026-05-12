@@ -12,7 +12,8 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Count, Max, Q
+from django.utils import timezone
 
 from apps.attachments.services import secure_upload
 from apps.notifications.webpush import send_to_user as send_webpush_to_user
@@ -117,22 +118,100 @@ class ChatService:
 
     @staticmethod
     def history_qs(user: User, partner_id):
-        """Ikki user orasidagi xabarlar (chronological reverse — eng yangisi avval)."""
+        """Ikki user orasidagi xabarlar (chronological reverse — eng yangisi avval).
+
+        Soft-delete bilan o'chirilgan xabarlar foydalanuvchilarga ko'rinmaydi.
+        """
         return ChatMessage.objects.filter(
+            is_deleted=False,
+        ).filter(
             (Q(sender=user) & Q(receiver_id=partner_id))
             | (Q(receiver=user) & Q(sender_id=partner_id))
         ).select_related('sender', 'receiver').prefetch_related('files')
 
     @staticmethod
+    def admin_conversation_qs(user_a_id, user_b_id):
+        """SUPER_ADMIN uchun istalgan ikki foydalanuvchi orasidagi suhbat.
+
+        O'chirilgan xabarlarni HAM ko'rsatadi (audit uchun) — frontend ularni
+        belgilab ko'rsatadi (is_deleted=True).
+        """
+        return ChatMessage.objects.filter(
+            (Q(sender_id=user_a_id) & Q(receiver_id=user_b_id))
+            | (Q(sender_id=user_b_id) & Q(receiver_id=user_a_id))
+        ).select_related('sender', 'receiver', 'deleted_by').prefetch_related('files')
+
+    @staticmethod
+    def admin_threads(*, search: str = '', limit: int = 200) -> list[dict]:
+        """Tizimdagi barcha suhbat juftliklari (eng yangisi avval).
+
+        Har bir element: user_a, user_b (ID lar tartibli), last_message_at, total_count.
+        Filter `search` — har ikki tomonning ism/familiya/username bo'yicha.
+        """
+        from django.db.models.functions import Least, Greatest
+        qs = ChatMessage.objects.all()
+        if search:
+            qs = qs.filter(
+                Q(sender__first_name__icontains=search)
+                | Q(sender__last_name__icontains=search)
+                | Q(sender__username__icontains=search)
+                | Q(receiver__first_name__icontains=search)
+                | Q(receiver__last_name__icontains=search)
+                | Q(receiver__username__icontains=search)
+            )
+        rows = (
+            qs.annotate(
+                u1=Least('sender_id', 'receiver_id'),
+                u2=Greatest('sender_id', 'receiver_id'),
+            )
+            .values('u1', 'u2')
+            .annotate(last_at=Max('created_at'), total=Count('id'))
+            .order_by('-last_at')[:limit]
+        )
+        return [
+            {
+                'user_a_id': str(r['u1']),
+                'user_b_id': str(r['u2']),
+                'last_message_at': r['last_at'].isoformat() if r['last_at'] else None,
+                'total': r['total'],
+            }
+            for r in rows
+        ]
+
+    @staticmethod
+    @transaction.atomic
+    def soft_delete(*, message: ChatMessage, by_user: User) -> ChatMessage:
+        """Habarni soft-delete qilib, ikki tomonga WS signal yuboradi."""
+        if message.is_deleted:
+            return message
+        message.is_deleted = True
+        message.deleted_at = timezone.now()
+        message.deleted_by = by_user
+        message.save(update_fields=['is_deleted', 'deleted_at', 'deleted_by', 'updated_at'])
+
+        payload = {
+            'channel': 'chat',
+            'event': 'deleted',
+            'message_id': str(message.id),
+            'sender_id': str(message.sender_id),
+            'receiver_id': str(message.receiver_id),
+        }
+        _send_ws(message.sender_id, payload)
+        _send_ws(message.receiver_id, payload)
+        return message
+
+    @staticmethod
     def unread_count_total(user: User) -> int:
-        return ChatMessage.objects.filter(receiver=user, viewed=False).count()
+        return ChatMessage.objects.filter(
+            receiver=user, viewed=False, is_deleted=False,
+        ).count()
 
     @staticmethod
     def unread_count_by_sender(user: User) -> list[dict]:
         """Sender bo'yicha guruhlangan o'qilmaganlar (production CountDto.bySender)."""
         rows = (
             ChatMessage.objects
-            .filter(receiver=user, viewed=False)
+            .filter(receiver=user, viewed=False, is_deleted=False)
             .values('sender_id')
             .annotate(count=Count('id'))
             .order_by()
@@ -143,12 +222,12 @@ class ChatService:
     def mark_read(user: User, message_ids: list) -> int:
         """Ko'rsatilgan xabarlarni o'qilgan deb belgilash."""
         return ChatMessage.objects.filter(
-            id__in=message_ids, receiver=user, viewed=False,
+            id__in=message_ids, receiver=user, viewed=False, is_deleted=False,
         ).update(viewed=True)
 
     @staticmethod
     def mark_thread_read(user: User, partner_id) -> int:
         """Ikki user orasidagi BARCHA o'qilmaganlarni read qilish."""
         return ChatMessage.objects.filter(
-            sender_id=partner_id, receiver=user, viewed=False,
+            sender_id=partner_id, receiver=user, viewed=False, is_deleted=False,
         ).update(viewed=True)

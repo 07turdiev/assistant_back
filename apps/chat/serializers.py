@@ -10,6 +10,7 @@ class ChatMessageSerializer(serializers.ModelSerializer):
     sender = UserShortSerializer(read_only=True)
     receiver = UserShortSerializer(read_only=True)
     files = AttachmentSerializer(many=True, read_only=True)
+    deleted_by = UserShortSerializer(read_only=True)
 
     class Meta:
         model = ChatMessage
@@ -17,6 +18,7 @@ class ChatMessageSerializer(serializers.ModelSerializer):
             'id', 'message', 'viewed',
             'sender', 'receiver', 'files',
             'created_at',
+            'is_deleted', 'deleted_at', 'deleted_by',
         )
 
 

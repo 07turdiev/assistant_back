@@ -28,6 +28,17 @@ class ChatMessage(AuditMixin):
     message = models.TextField(blank=True, default='')
     viewed = models.BooleanField(default=False)
 
+    # Soft delete — faqat SUPER_ADMIN o'chira oladi. Yozuvlar audit uchun saqlanadi,
+    # lekin foydalanuvchilarga ko'rinmaydi.
+    is_deleted = models.BooleanField(default=False, db_index=True)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    deleted_by = models.ForeignKey(
+        'users.User',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='chat_deleted',
+    )
+
     class Meta:
         ordering = ['-created_at']
         indexes = [
