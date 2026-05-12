@@ -77,6 +77,13 @@ class ChatService:
             or sender.username
         preview = (msg.message or ('📎 Fayl' if files else '')).strip()[:140]
 
+        # Sender avatar — bildirishnomada sayt logosi o'rniga ko'rsatiladi.
+        # OS notification icon'i absolyut URL kutadi (push servisi alohida domenda).
+        sender_avatar_url = ''
+        if sender.avatar:
+            base = getattr(settings, 'FRONTEND_BASE_URL', '').rstrip('/')
+            sender_avatar_url = f'{base}{sender.avatar.url}' if base else sender.avatar.url
+
         # Web Push (tab yopiq/blur bo'lganda OS bildirishnomasi)
         try:
             send_webpush_to_user(
@@ -85,6 +92,7 @@ class ChatService:
                 body=preview,
                 url=f'/?openChat={sender.id}',
                 tag=f'chat-{sender.id}',
+                icon=sender_avatar_url,
                 data={'channel': 'chat', 'sender_id': str(sender.id), 'skipIfFocused': True},
             )
         except Exception as e:  # noqa: BLE001

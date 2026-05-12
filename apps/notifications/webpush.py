@@ -55,8 +55,13 @@ def send_to_subscription(sub: WebPushSubscription, payload: dict) -> bool:
 
 
 def send_to_user(user_id, *, title: str, body: str = '', url: str = '/',
-                 is_important: bool = False, tag: str = '', data: dict | None = None) -> int:
+                 is_important: bool = False, tag: str = '', icon: str = '',
+                 data: dict | None = None) -> int:
     """User'ning barcha subscription'lariga push yuborish.
+
+    Args:
+        icon: ko'rinadigan rasm URL'i (chat uchun — yuboruvchi avatari). Bo'sh bo'lsa
+            frontend sw.js favicon'ga qaytadi.
 
     Returns: yuborilgan push'lar soni.
     """
@@ -68,6 +73,8 @@ def send_to_user(user_id, *, title: str, body: str = '', url: str = '/',
     }
     if tag:
         payload['tag'] = tag
+    if icon:
+        payload['icon'] = icon
     if data:
         payload['data'] = data
 
