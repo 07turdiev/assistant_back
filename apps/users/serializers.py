@@ -26,11 +26,16 @@ class UserShortSerializer(serializers.ModelSerializer):
         )
 
     def get_avatar_url(self, obj: User):
-        if obj.avatar:
-            request = self.context.get('request')
-            url = obj.avatar.url
-            return request.build_absolute_uri(url) if request else url
-        return None
+        if not obj.avatar:
+            return None
+        request = self.context.get('request')
+        url = obj.avatar.url
+        # Cache-bust: foydalanuvchi avatarini yangilaganda URL o'zgaradi,
+        # shu sababli brauzer eski rasmni cache'dan ko'rsatmaydi.
+        if obj.updated_at:
+            sep = '&' if '?' in url else '?'
+            url = f'{url}{sep}v={int(obj.updated_at.timestamp())}'
+        return request.build_absolute_uri(url) if request else url
 
 
 class UserMeSerializer(UserShortSerializer):
