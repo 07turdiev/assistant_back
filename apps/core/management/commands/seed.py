@@ -13,14 +13,13 @@ from apps.users.enums import RoleName
 from apps.users.models import Role, User
 
 ROLES = [
-    ('SUPER_ADMIN', 'Супер Админ', 'Супер Админ'),
-    ('PREMIER_MINISTER', 'Вазир', 'Министр'),
-    ('VICE_MINISTER', 'Вазир ўринбосари', 'Замминистра'),
-    ('ASSISTANT_PREMIER', 'Вазир ёрдамчиси', 'Помощник министра'),
-    ('HEAD', 'Бошлиқ', 'Руководитель'),
-    ('ASSISTANT', 'Ёрдамчи', 'Помощник'),
-    ('ADMIN', 'Админ', 'Админ'),
-    ('EMPLOYEE', 'Ходим', 'Сотрудник'),
+    ('SUPER_ADMIN', 'Super admin', 'Супер админ'),
+    ('ADMIN', 'Admin', 'Админ'),
+    ('VAZIR', 'Vazir', 'Министр'),
+    ('ORINBOSAR', "Vazir o'rinbosari", 'Замминистра'),
+    ('YORDAMCHI', 'Yordamchi', 'Помощник'),
+    ('BOSHLIQ', 'Boshliq', 'Руководитель'),
+    ('XODIM', 'Xodim', 'Сотрудник'),
 ]
 
 REGIONS = [
@@ -65,9 +64,9 @@ class Command(BaseCommand):
             self.stdout.write('Sample events allaqachon mavjud')
             return
 
-        premier = User.objects.filter(role__name=RoleName.PREMIER_MINISTER).first()
-        head = User.objects.filter(role__name=RoleName.HEAD).first()
-        employee = User.objects.filter(role__name=RoleName.EMPLOYEE).first()
+        premier = User.objects.filter(role__name=RoleName.VAZIR).first()
+        head = User.objects.filter(role__name=RoleName.BOSHLIQ).first()
+        employee = User.objects.filter(role__name=RoleName.XODIM).first()
         if not premier:
             return
 
@@ -216,7 +215,7 @@ class Command(BaseCommand):
             },
             {
                 'username': 'premier',
-                'role': roles[RoleName.PREMIER_MINISTER],
+                'role': roles[RoleName.VAZIR],
                 'first_name': 'Premier',
                 'last_name': 'Minister',
                 'position_uz': 'Vazir',
@@ -224,7 +223,7 @@ class Command(BaseCommand):
             },
             {
                 'username': 'vice1',
-                'role': roles[RoleName.VICE_MINISTER],
+                'role': roles[RoleName.ORINBOSAR],
                 'first_name': 'Vice',
                 'last_name': 'Minister',
                 'position_uz': "Vazir o'rinbosari",
@@ -241,7 +240,7 @@ class Command(BaseCommand):
             },
             {
                 'username': 'head1',
-                'role': roles[RoleName.HEAD],
+                'role': roles[RoleName.BOSHLIQ],
                 'first_name': 'Head',
                 'last_name': 'User',
                 'position_uz': "Bo'lim boshlig'i",
@@ -249,7 +248,7 @@ class Command(BaseCommand):
             },
             {
                 'username': 'employee1',
-                'role': roles[RoleName.EMPLOYEE],
+                'role': roles[RoleName.XODIM],
                 'first_name': 'Employee',
                 'last_name': 'One',
                 'position_uz': 'Xodim',

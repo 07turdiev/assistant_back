@@ -106,12 +106,13 @@ class NotificationService:
     """Tadbir bildirishnomalarini ko'p kanalga yuboradi."""
 
     @classmethod
-    def dispatch_event(cls, event, *, notification_type: str) -> None:
+    def dispatch_event(cls, event, *, notification_type: str, only_user_ids=None) -> None:
         """Asosiy entry: tadbir uchun barcha kanallarga xabar yuborish.
 
         Args:
             event: Event instance
             notification_type: NotificationType qiymati (NEW, EDITED, DELETED, REMINDED, PRE_EVENT)
+            only_user_ids: berilsa — faqat shu foydalanuvchilarga (delegatsiya/yo'naltirish uchun)
         """
         texts = EVENT_NOTIFY_TEXTS.get(notification_type, EVENT_NOTIFY_TEXTS[NotificationType.NEW])
 
@@ -121,6 +122,11 @@ class NotificationService:
         # Speaker o'zi ham xabardor bo'lsin
         if event.speaker_id and not any(r.id == event.speaker_id for r in recipients):
             recipients.append(event.speaker)
+
+        # Yo'naltirishda — faqat tanlangan foydalanuvchilarga
+        if only_user_ids is not None:
+            only = set(only_user_ids)
+            recipients = [r for r in recipients if r.id in only]
 
         if not recipients:
             return

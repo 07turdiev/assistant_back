@@ -101,7 +101,7 @@ class UserViewSet(viewsets.ModelViewSet):
         if self.action in write_actions:
             return [IsAuthenticated(), IsAdminRole()]
         if self.action == 'vice':
-            return [IsAuthenticated(), HasRole.with_roles('PREMIER_MINISTER', 'SUPER_ADMIN')()]
+            return [IsAuthenticated(), HasRole.with_roles('VAZIR', 'SUPER_ADMIN')()]
         return [IsAuthenticated()]
 
     def _is_admin(self) -> bool:
@@ -142,7 +142,7 @@ class UserViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def vice(self, request):
-        qs = self.queryset.filter(role__name=RoleName.VICE_MINISTER)
+        qs = self.queryset.filter(role__name=RoleName.ORINBOSAR)
         page = self.paginate_queryset(qs)
         ser = UserShortSerializer(page or qs, many=True, context={'request': request})
         if page is not None:

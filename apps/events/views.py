@@ -18,6 +18,7 @@ from apps.users.models import User
 from .models import Event, PreEvent
 from .serializers import (
     EventDetailSerializer,
+    EventForwardSerializer,
     EventInputSerializer,
     EventListSerializer,
     PreEventSerializer,
@@ -26,11 +27,10 @@ from .services import EventService, calendar_for_vice, calendar_user_ids
 
 
 CREATE_ROLES = (
-    RoleName.PREMIER_MINISTER,
-    RoleName.VICE_MINISTER,
-    RoleName.ASSISTANT_PREMIER,
-    RoleName.HEAD,
-    RoleName.ASSISTANT,
+    RoleName.VAZIR,
+    RoleName.ORINBOSAR,
+    RoleName.YORDAMCHI,
+    RoleName.BOSHLIQ,
     RoleName.ADMIN,
     RoleName.SUPER_ADMIN,
 )
@@ -114,7 +114,7 @@ class EventViewSet(viewsets.ModelViewSet):
         """
         user = request.user
         vice_id = request.query_params.get('vice_id')
-        if vice_id and user.role and user.role.name == RoleName.PREMIER_MINISTER:
+        if vice_id and user.role and user.role.name == RoleName.VAZIR:
             user_ids = calendar_for_vice(vice_id)
         else:
             user_ids = calendar_user_ids(user)
@@ -134,6 +134,22 @@ class EventViewSet(viewsets.ModelViewSet):
         """
         event = self.get_object()
         return Response(EventDetailSerializer(event, context={'request': request}).data)
+
+    # --------- DELEGATSIYA (boshliq → quyi xodimlar) ---------
+
+    @action(detail=True, methods=['post'], url_path='forward')
+    def forward(self, request, pk=None):
+        """`POST /api/events/{id}/forward/` — boshliq tadbirni o'z xodimlariga yo'naltiradi."""
+        event = self.get_object()
+        ser = EventForwardSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        added = EventService.forward_to_subordinates(
+            event,
+            user=request.user,
+            subordinate_ids=ser.validated_data['subordinate_ids'],
+        )
+        return Response({'success': True, 'added': added,
+                         'message': f'{added} ta xodim qo\'shildi'})
 
     # --------- CREATE / UPDATE / DELETE ---------
 

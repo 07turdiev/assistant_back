@@ -66,19 +66,12 @@ def resolve_intent(
         else:
             result.warnings.append(f'"{parent_dept_name}" — bunday yuqori turuvchi bo\'lim topilmadi')
 
-    # 1. Bo'lim aytilganmi?
+    # 1. Bo'lim aytilganmi? (tadbir mazmuni — bo'lim boshlig'i qatnashchi bo'lib qo'shiladi)
     target_dept_name = (intent.get('target_department') or '').strip()
     if target_dept_name:
         direction = _resolve_direction(target_dept_name)
         if direction:
             result.target_direction = direction
-            head = _find_head_of_direction(direction)
-            if head:
-                result.assigned_to = head
-            else:
-                result.warnings.append(
-                    f'"{direction.name_uz}" bo\'limi topildi, ammo HEAD foydalanuvchi mavjud emas'
-                )
         else:
             result.warnings.append(f'"{target_dept_name}" — bunday bo\'lim DB\'da topilmadi')
 
@@ -106,24 +99,10 @@ def resolve_intent(
         else:
             result.warnings.append("Bo'lim rahbarlari (HEAD) DB'da topilmadi")
 
-    # 3. Agar bo'lim aytilmasdan, oluvchi sender'ning bo'ysunuvchilaridan tanlanadi
-    if not result.assigned_to and not target_dept_name:
-        subordinates = list(_get_subordinates(sender))
-        if len(subordinates) == 1:
-            result.assigned_to = subordinates[0]
-        elif len(subordinates) > 1:
-            # Ko'p bo'ysunuvchi — bot foydalanuvchidan tanlashni so'raydi
-            result.needs_user_choice = True
-            result.candidate_subordinates = subordinates
-            # Default — birinchisini tayinlaymiz (foydalanuvchi keyin o'zgartirsa bo'ladi)
-            result.assigned_to = subordinates[0]
-        elif all_heads_requested:
-            # "Barcha rahbarlar" aytilgan, bo'ysunuvchi yo'q — yuboruvchi o'zi ko'rib joylashtiradi
-            result.assigned_to = sender
-        else:
-            result.warnings.append(
-                'Sizda bo\'ysunuvchi xodim yo\'q — qoralama uchun oluvchini saytda qo\'lda tanlang'
-            )
+    # 3. Qoralamani KO'RIB TASDIQLOVCHI = yuboruvchining yordamchisi (YORDAMCHI).
+    #    Yordamchi bo'lmasa — yuboruvchining o'zi ko'rib joylashtiradi.
+    assistant = _find_assistant(sender)
+    result.assigned_to = assistant or sender
 
     return result
 
@@ -176,13 +155,25 @@ def _resolve_direction(name: str) -> 'Direction | None':
 
 
 def _find_head_of_direction(direction: 'Direction') -> 'User | None':
-    """Bo'limning HEAD rolidagi xodimini topadi."""
+    """Bo'limning ma'sul shaxsi — avval `Direction.head`, bo'lmasa BOSHLIQ rolidagi xodim."""
+    head = getattr(direction, 'head', None)
+    if head and head.enabled:
+        return head
     from apps.users.enums import RoleName
     from apps.users.models import User
     return User.objects.filter(
         direction=direction,
-        role__name=RoleName.HEAD,
+        role__name=RoleName.BOSHLIQ,
         enabled=True,
+    ).first()
+
+
+def _find_assistant(sender: 'User') -> 'User | None':
+    """Yuboruvchining yordamchisi (YORDAMCHI, chief=sender) — qoralamani ko'rib tasdiqlovchi."""
+    from apps.users.enums import RoleName
+    from apps.users.models import User
+    return User.objects.filter(
+        chief=sender, role__name=RoleName.YORDAMCHI, enabled=True,
     ).first()
 
 
@@ -209,7 +200,7 @@ def _get_all_heads() -> list:
     from apps.users.enums import RoleName
     from apps.users.models import User
     return list(
-        User.objects.filter(role__name=RoleName.HEAD, enabled=True).order_by('last_name', 'first_name')
+        User.objects.filter(role__name=RoleName.BOSHLIQ, enabled=True).order_by('last_name', 'first_name')
     )
 
 

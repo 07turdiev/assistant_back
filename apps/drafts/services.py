@@ -166,12 +166,17 @@ def publish_event_draft(draft: EventDraft) -> Event:
         direction=direction,
         speaker=draft.speaker,
         notify_time=draft.notify_minutes_before,
+        # Ovozni yuborgan (vazir/o'rinbosar) nomidan — yordamchi joylasa ham
+        on_behalf_of=draft.created_by,
     )
 
-    # Qatnashchilar — suggested + assigned_to
+    # Qatnashchilar — aytilgan odamlar + yo'naltirilgan bo'lim boshlig'i
     participant_users = set(draft.suggested_participants.all())
-    if draft.assigned_to:
-        participant_users.add(draft.assigned_to)
+    if draft.target_direction:
+        event.participant_directions.set([draft.target_direction])
+        head = draft.target_direction.head
+        if head and head.enabled:
+            participant_users.add(head)
     for user in participant_users:
         EventParticipant.objects.create(event=event, user=user)
 

@@ -45,6 +45,17 @@ def _cancel_reminders(event_id) -> None:
         logger.exception(f'Cancel reminders xatosi (event={event_id}): {e}')
 
 
+def _dispatch_notification_to(event, notification_type: str, only_user_ids) -> None:
+    """Tadbir bildirishnomasini faqat tanlangan foydalanuvchilarga yuborish (delegatsiya)."""
+    try:
+        from apps.notifications.services import NotificationService
+        NotificationService.dispatch_event(
+            event, notification_type=notification_type, only_user_ids=only_user_ids,
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.exception(f'Targeted notification dispatch xatosi: {e}')
+
+
 class EventService:
     """Tadbir yaratish/tahrirlash/o'chirish."""
 
@@ -56,6 +67,9 @@ class EventService:
 
     @staticmethod
     def _resolve_speaker(speaker_id):
+        """Ma'ruzachi (ixtiyoriy). Berilmasa None qaytaradi."""
+        if not speaker_id:
+            return None
         try:
             return User.objects.get(pk=speaker_id)
         except User.DoesNotExist as exc:
@@ -63,6 +77,8 @@ class EventService:
 
     @staticmethod
     def _resolve_participants(participant_ids):
+        if not participant_ids:
+            return []
         users = list(User.objects.filter(pk__in=participant_ids))
         if len(users) != len(set(participant_ids)):
             found_ids = {str(u.id) for u in users}
@@ -71,7 +87,37 @@ class EventService:
         return users
 
     @staticmethod
-    def _resolve_direction(user: User, direction_id):
+    def _resolve_directions_and_heads(direction_ids):
+        """Tanlangan bo'limlar → (directions, head'lar ro'yxati).
+
+        Yuqori rollar bo'lim tanlaydi; har bo'limning `head` (ma'sul shaxsi) qatnashchi bo'ladi.
+        """
+        if not direction_ids:
+            return [], []
+        directions = list(Direction.objects.filter(pk__in=direction_ids).select_related('head'))
+        heads = [d.head for d in directions if d.head_id and d.head and d.head.enabled]
+        return directions, heads
+
+    @staticmethod
+    def _merge_participants(*user_lists):
+        """Bir nechta ro'yxatdagi User'larni birlashtirib, takrorlanmaslarni qaytaradi."""
+        seen, result = set(), []
+        for lst in user_lists:
+            for u in lst:
+                if u and u.id not in seen:
+                    seen.add(u.id)
+                    result.append(u)
+        return result
+
+    @staticmethod
+    def _resolve_on_behalf_of(user: User):
+        """Kim nomidan: yordamchi yaratsa — uning rahbari (vazir/o'rinbosar); aks holda — o'zi."""
+        if user.role and user.role.name == RoleName.YORDAMCHI and user.chief_id:
+            return user.chief
+        return user
+
+    @staticmethod
+    def _resolve_direction(user: User, direction_id, fallback_directions=None):
         if direction_id:
             try:
                 return Direction.objects.get(pk=direction_id)
@@ -79,16 +125,25 @@ class EventService:
                 raise ValidationError({'direction_id': "Yo'nalish topilmadi"}) from exc
         if user.direction_id:
             return user.direction
-        raise ValidationError("Yo'nalishni aniqlab bo'lmadi (foydalanuvchi yoki dto'da yo'q)")
+        # Yuqori rollarda (VAZIR) bo'lim yo'q — tanlangan bo'limlardan birinchisini olamiz
+        if fallback_directions:
+            return fallback_directions[0]
+        raise ValidationError("Yo'nalishni aniqlab bo'lmadi (bo'lim yoki xodim tanlang)")
 
     @classmethod
     @transaction.atomic
     def create(cls, *, validated_data, files, user: User) -> Event:
         cls._validate_in_future(validated_data['date'], validated_data['end_time'])
 
-        speaker = cls._resolve_speaker(validated_data['speaker_id'])
-        participants = cls._resolve_participants(validated_data['participant_ids'])
-        direction = cls._resolve_direction(user, validated_data.get('direction_id'))
+        # Ma'ruzachi ixtiyoriy — berilmasa yaratuvchi
+        speaker = cls._resolve_speaker(validated_data.get('speaker_id')) or user
+        # Qatnashchilar: to'g'ridan-to'g'ri odamlar (boshliq tanlasa) + bo'limlar boshliqlari
+        people = cls._resolve_participants(validated_data.get('participant_ids'))
+        directions, dir_heads = cls._resolve_directions_and_heads(
+            validated_data.get('participant_direction_ids'),
+        )
+        participants = cls._merge_participants(people, dir_heads)
+        direction = cls._resolve_direction(user, validated_data.get('direction_id'), directions)
 
         event = Event.objects.create(
             title=validated_data['title'],
@@ -106,12 +161,16 @@ class EventService:
             notify_time=validated_data.get('notify_time_list') or [],
             direction=direction,
             speaker=speaker,
+            on_behalf_of=cls._resolve_on_behalf_of(user),
         )
 
-        # Qatnashchilar
+        # Qatnashchilar (bo'lim boshliqlari + tanlangan odamlar)
         EventParticipant.objects.bulk_create([
             EventParticipant(event=event, user=u) for u in participants
         ])
+        # Tanlangan bo'limlarni saqlash (ko'rsatish uchun)
+        if directions:
+            event.participant_directions.set(directions)
 
         # Visitors
         for v in validated_data.get('visitors') or []:
@@ -144,9 +203,13 @@ class EventService:
 
         cls._validate_in_future(validated_data['date'], validated_data['end_time'])
 
-        speaker = cls._resolve_speaker(validated_data['speaker_id'])
-        participants = cls._resolve_participants(validated_data['participant_ids'])
-        direction = cls._resolve_direction(user, validated_data.get('direction_id'))
+        speaker = cls._resolve_speaker(validated_data.get('speaker_id')) or event.speaker or user
+        people = cls._resolve_participants(validated_data.get('participant_ids'))
+        directions, dir_heads = cls._resolve_directions_and_heads(
+            validated_data.get('participant_direction_ids'),
+        )
+        participants = cls._merge_participants(people, dir_heads)
+        direction = cls._resolve_direction(user, validated_data.get('direction_id'), directions)
 
         # Asosiy maydonlar
         for field in ('title', 'description', 'date', 'start_time', 'end_time',
@@ -161,6 +224,9 @@ class EventService:
         event.speaker = speaker
         event.direction = direction
         event.save()
+
+        # Tanlangan bo'limlarni yangilash (ko'rsatish uchun)
+        event.participant_directions.set(directions)
 
         # Qatnashchilar (replace strategiyasi)
         existing_user_ids = set(event.participants.values_list('id', flat=True))
@@ -204,6 +270,40 @@ class EventService:
         transaction.on_commit(lambda: _schedule_reminders(event))
 
         return event
+
+    @classmethod
+    @transaction.atomic
+    def forward_to_subordinates(cls, event: Event, *, user: User, subordinate_ids: list) -> int:
+        """Boshliq tadbirni o'z quyi xodimlariga yo'naltiradi (ularni qatnashchi qiladi).
+
+        - Faqat tadbir qatnashchisi (yoki yaratuvchi/superuser) yo'naltira oladi
+        - Faqat o'zining quyi xodimlarini qo'sha oladi (chief=user)
+        - Yangi qo'shilganlargagina bildirishnoma yuboriladi
+        """
+        is_participant = event.participant_links.filter(user_id=user.id).exists()
+        if not is_participant and event.created_by_id != user.id and not user.is_superuser:
+            raise PermissionDenied("Faqat tadbir qatnashchisi yo'naltira oladi")
+
+        valid_subs = list(
+            User.objects.filter(pk__in=subordinate_ids or [], chief_id=user.id, enabled=True),
+        )
+        if not valid_subs:
+            raise ValidationError("Yo'naltirish uchun o'z xodimlaringizdan tanlang")
+
+        existing = set(event.participants.values_list('id', flat=True))
+        to_add = [u for u in valid_subs if u.id not in existing]
+        if not to_add:
+            return 0
+
+        EventParticipant.objects.bulk_create([
+            EventParticipant(event=event, user=u) for u in to_add
+        ])
+
+        add_ids = [u.id for u in to_add]
+        transaction.on_commit(
+            lambda: _dispatch_notification_to(event, NotificationType.NEW, add_ids),
+        )
+        return len(to_add)
 
     @classmethod
     @transaction.atomic

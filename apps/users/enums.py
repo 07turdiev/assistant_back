@@ -2,14 +2,19 @@ from django.db import models
 
 
 class RoleName(models.TextChoices):
-    SUPER_ADMIN = 'SUPER_ADMIN', 'Супер Админ'
-    PREMIER_MINISTER = 'PREMIER_MINISTER', 'Вазир'
-    VICE_MINISTER = 'VICE_MINISTER', 'Вазир ўринбосари'
-    ASSISTANT_PREMIER = 'ASSISTANT_PREMIER', 'Вазир ёрдамчиси'
-    HEAD = 'HEAD', 'Бошлиқ'
-    ASSISTANT = 'ASSISTANT', 'Ёрдамчи'
-    ADMIN = 'ADMIN', 'Админ'
-    EMPLOYEE = 'EMPLOYEE', 'Ходим'
+    """Tashkiliy tuzilmaga moslangan rollar (2026 buyrug'i).
+
+    Kontekst `chief` va `direction` orqali aniqlanadi:
+    - YORDAMCHI kimning yordamchisi → chief (VAZIR yoki ORINBOSAR)
+    - BOSHLIQ boshqarma yoki bo'lim boshlig'imi → Direction.kind
+    """
+    SUPER_ADMIN = 'SUPER_ADMIN', 'Super admin'
+    ADMIN = 'ADMIN', 'Admin'
+    VAZIR = 'VAZIR', 'Vazir'
+    ORINBOSAR = 'ORINBOSAR', "Vazir o'rinbosari"
+    YORDAMCHI = 'YORDAMCHI', 'Yordamchi'
+    BOSHLIQ = 'BOSHLIQ', 'Boshliq'
+    XODIM = 'XODIM', 'Xodim'
 
 
 class UserStatus(models.TextChoices):

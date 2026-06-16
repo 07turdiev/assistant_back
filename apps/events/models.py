@@ -42,7 +42,8 @@ class Event(AuditMixin):
     )
     speaker = models.ForeignKey(
         'users.User',
-        on_delete=models.PROTECT,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
         related_name='events_as_speaker',
     )
     participants = models.ManyToManyField(
@@ -50,6 +51,20 @@ class Event(AuditMixin):
         through='EventParticipant',
         through_fields=('event', 'user'),
         related_name='events',
+    )
+    # Tadbir yo'naltirilgan bo'lim/boshqarmalar (ma'sul shaxslar shulardan olinadi).
+    # Yuqori rollar (VAZIR/ORINBOSAR/YORDAMCHI) bo'lim tanlaydi → boshliq qatnashchi bo'ladi.
+    participant_directions = models.ManyToManyField(
+        'directions.Direction',
+        blank=True,
+        related_name='events_as_target',
+    )
+    # "Nomidan" — yordamchi yaratsa, asl egasi (vazir/o'rinbosar). Bo'sh bo'lsa = yaratuvchi.
+    on_behalf_of = models.ForeignKey(
+        'users.User',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='events_on_behalf',
     )
     # `notify_time` (List<Integer>) — SQLite dev uchun JSONField,
     # PostgreSQL ga ko'chganda ArrayField'ga converted bo'lsa ham bo'ladi.
