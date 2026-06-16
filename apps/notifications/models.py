@@ -20,6 +20,8 @@ class Notification(AuditMixin):
 
     event_id = models.UUIDField(null=True, blank=True)
     pre_event_id = models.UUIDField(null=True, blank=True)
+    # E'lon (Report) bildirishnomasi — bosilganda o'sha e'lon sahifasiga o'tish uchun
+    report_id = models.UUIDField(null=True, blank=True)
 
     date = models.DateField(null=True, blank=True)
     start_time = models.DateTimeField(null=True, blank=True)

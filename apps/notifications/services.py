@@ -280,6 +280,7 @@ class NotificationService:
                 user_id=uid,
                 title=title or "E'lon",
                 notification_type=NotificationType.ANNOUNCEMENT,
+                report_id=announcement.id,
                 is_important=False,
                 seen=False,
             )

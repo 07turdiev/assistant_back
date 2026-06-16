@@ -8,7 +8,7 @@ class NotificationSerializer(serializers.ModelSerializer):
         model = Notification
         fields = (
             'id', 'user_id', 'title', 'notification_type',
-            'event_id', 'pre_event_id',
+            'event_id', 'pre_event_id', 'report_id',
             'date', 'start_time', 'end_time',
             'is_important', 'seen', 'created_at',
         )
