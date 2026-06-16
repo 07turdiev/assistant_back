@@ -6,7 +6,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.directions.models import Direction
-from apps.events.models import Event, EventParticipant, PreEvent, Visitor
+from apps.events.models import Event, EventParticipant, Visitor
 from apps.info.enums import EventType, NotificationType, Sphere  # noqa: F401
 from apps.organisations.models import District, Organisation, Region
 from apps.users.enums import RoleName
@@ -115,17 +115,6 @@ class Command(BaseCommand):
             for v in visitors:
                 Visitor.objects.create(event=event, **v)
             self.stdout.write(f'  + Event: {event.title}')
-
-        # PreEvent ham 1 dona
-        if not PreEvent.objects.exists():
-            PreEvent.objects.create(
-                title='Kelgusi tadbir loyihasi',
-                description='Aniqlanmagan',
-                date=today + timedelta(days=14),
-                start_time=timezone.make_aware(datetime.combine(today + timedelta(days=14), time(9, 0))),
-                end_time=timezone.make_aware(datetime.combine(today + timedelta(days=14), time(11, 0))),
-            )
-            self.stdout.write('  + PreEvent yaratildi')
 
     def _seed_roles(self):
         for name, uz, ru in ROLES:

@@ -13,7 +13,7 @@ from apps.info.enums import NotificationType
 from apps.users.enums import RoleName
 from apps.users.models import User
 
-from .models import Event, EventParticipant, PreEvent, Visitor
+from .models import Event, EventParticipant, Visitor
 
 logger = logging.getLogger(__name__)
 
@@ -181,11 +181,6 @@ class EventService:
             att = secure_upload(f, target='documents')
             att.file_event = event
             att.save(update_fields=['file_event'])
-
-        # PreEvent o'chirish
-        pre_event_id = validated_data.get('pre_event_id')
-        if pre_event_id:
-            PreEvent.objects.filter(pk=pre_event_id).delete()
 
         # Bildirishnoma — barcha qatnashchilar va recursive yordamchilarga
         transaction.on_commit(lambda: _dispatch_notification(event, NotificationType.NEW))

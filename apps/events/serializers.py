@@ -17,7 +17,7 @@ from rest_framework import serializers
 from apps.attachments.serializers import AttachmentSerializer
 from apps.users.serializers import UserShortSerializer
 
-from .models import Event, EventParticipant, PreEvent, Visitor
+from .models import Event, EventParticipant, Visitor
 
 
 class VisitorSerializer(serializers.ModelSerializer):
@@ -102,7 +102,6 @@ class EventInputSerializer(serializers.Serializer):
         child=serializers.UUIDField(), required=False, default=list,
     )
     visitors = VisitorSerializer(many=True, required=False, default=list)
-    pre_event_id = serializers.UUIDField(required=False, allow_null=True)
     direction_id = serializers.UUIDField(required=False, allow_null=True)
     serial_number = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     conclusion = serializers.CharField(required=False, allow_blank=True, default='')
@@ -138,9 +137,3 @@ class EventParticipantSerializer(serializers.ModelSerializer):
         fields = ('id', 'user', 'is_present', 'comment')
 
 
-class PreEventSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = PreEvent
-        fields = ('id', 'title', 'description', 'date', 'start_time', 'end_time',
-                  'created_at', 'created_by')
-        read_only_fields = ('id', 'created_at', 'created_by')

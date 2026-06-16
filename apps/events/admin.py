@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Event, EventParticipant, PreEvent, Visitor
+from .models import Event, EventParticipant, Visitor
 
 
 class VisitorInline(admin.TabularInline):
@@ -22,13 +22,6 @@ class EventAdmin(admin.ModelAdmin):
     raw_id_fields = ('direction', 'speaker', 'created_by', 'updated_by')
     readonly_fields = ('id', 'created_at', 'updated_at', 'created_by', 'updated_by')
     inlines = [VisitorInline, EventParticipantInline]
-
-
-@admin.register(PreEvent)
-class PreEventAdmin(admin.ModelAdmin):
-    list_display = ('title', 'date', 'start_time', 'end_time')
-    search_fields = ('title', 'description')
-    readonly_fields = ('id', 'created_at', 'updated_at', 'created_by', 'updated_by')
 
 
 @admin.register(Visitor)

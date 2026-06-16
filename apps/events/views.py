@@ -15,13 +15,12 @@ from apps.core.permissions import HasRole
 from apps.users.enums import RoleName
 from apps.users.models import User
 
-from .models import Event, PreEvent
+from .models import Event
 from .serializers import (
     EventDetailSerializer,
     EventForwardSerializer,
     EventInputSerializer,
     EventListSerializer,
-    PreEventSerializer,
 )
 from .services import EventService, calendar_for_vice, calendar_user_ids
 
@@ -262,9 +261,3 @@ class EventViewSet(viewsets.ModelViewSet):
                 pass
 
         return data
-
-
-class PreEventViewSet(viewsets.ModelViewSet):
-    queryset = PreEvent.objects.all()
-    serializer_class = PreEventSerializer
-    permission_classes = [IsAuthenticated]

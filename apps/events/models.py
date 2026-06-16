@@ -93,26 +93,6 @@ class EventParticipant(AuditMixin):
         unique_together = [('event', 'user')]
 
 
-class PreEvent(AuditMixin):
-    """Tadbir loyihasi (event'ga aylantirilishi mumkin).
-
-    DIQQAT: production'da `startTime`/`endTime` — **LocalDateTime** (Event.start_time/end_time
-    LocalTime'dan farqli). Bu erda `start_time`/`end_time` DateTimeField.
-    """
-
-    title = models.CharField(max_length=255)
-    description = models.CharField(max_length=255, blank=True, default='')
-    date = models.DateField()
-    start_time = models.DateTimeField()
-    end_time = models.DateTimeField()
-
-    class Meta:
-        ordering = ['-date', '-start_time']
-
-    def __str__(self) -> str:
-        return self.title
-
-
 class Visitor(AuditMixin):
     """Tadbir mehmonlari ro'yxati."""
 
