@@ -14,7 +14,7 @@ from typing import Any
 
 from apps.ai.prompts import build_intent_system_prompt
 
-from .llm import OllamaClient, OllamaError
+from .base import LLMClient, LLMError, get_llm_client
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ def parse_intent(
     text: str,
     *,
     today: date | None = None,
-    client: OllamaClient | None = None,
+    client: LLMClient | None = None,
     intent_type_hint: str | None = None,
 ) -> tuple[dict[str, Any], list[str]]:
     """Foydalanuvchi matnini tahlil qilib, strukturalangan dict + ogohlantirishlar qaytaradi.
@@ -44,7 +44,7 @@ def parse_intent(
     Args:
         text: foydalanuvchi yuborgan o'zbekcha matn (STT natijasi)
         today: hisob asoslangan sana (default: bugungi)
-        client: Ollama klient (default: yangi yaratiladi)
+        client: LLM klient (default: settings.AI_PROVIDER bo'yicha tanlanadi)
         intent_type_hint: 'event' yoki 'task' (Telegram tugmasidan kelgan ipucu)
 
     Returns:
@@ -53,15 +53,15 @@ def parse_intent(
     if not text or not text.strip():
         raise ValueError('Bo\'sh matn berildi')
 
-    client = client or OllamaClient()
+    client = client or get_llm_client()
     system_prompt = build_intent_system_prompt(today=today)
 
-    logger.debug('Intent parser chaqirilmoqda: %s', text[:200])
+    logger.debug('Intent parser chaqirilmoqda (%s): %s', type(client).__name__, text[:200])
     try:
         raw = client.chat_json(system=system_prompt, user=text.strip())
         intent = _normalize(raw)
         return intent, []
-    except (OllamaError, ValueError) as e:
+    except (LLMError, ValueError) as e:
         logger.warning('AI parser yiqildi, fallback ishlatilmoqda: %s', e)
         fallback = _build_fallback(text, intent_type_hint)
         warnings = [

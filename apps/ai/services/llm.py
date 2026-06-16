@@ -12,10 +12,12 @@ from typing import Any
 import requests
 from django.conf import settings
 
+from .base import LLMError
+
 logger = logging.getLogger(__name__)
 
 
-class OllamaError(RuntimeError):
+class OllamaError(LLMError):
     """Ollama bilan bog'liq xatolik."""
 
 

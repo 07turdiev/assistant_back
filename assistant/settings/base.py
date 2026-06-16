@@ -214,9 +214,17 @@ EMAIL_HOST_USER = config('SMTP_USER', default='')
 EMAIL_HOST_PASSWORD = config('SMTP_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = config('SMTP_FROM', default='') or EMAIL_HOST_USER
 
+# AI / LLM provayder tanlovi: 'ollama' (lokal) yoki 'gemini' (Google bulut, tezroq)
+AI_PROVIDER = config('AI_PROVIDER', default='ollama')
+
 # AI / LLM (Ollama lokal server)
 OLLAMA_URL = config('OLLAMA_URL', default='http://localhost:11434')
 OLLAMA_MODEL = config('OLLAMA_MODEL', default='qwen3:14b')
+
+# Google Gemini (AI_PROVIDER='gemini' bo'lganda ishlatiladi)
+GEMINI_API_KEY = config('GEMINI_API_KEY', default='')
+GEMINI_MODEL = config('GEMINI_MODEL', default='gemini-2.5-flash')
+GEMINI_API_URL = config('GEMINI_API_URL', default='https://generativelanguage.googleapis.com/v1beta')
 
 # STT — UzbekVoice.ai
 UZBEKVOICE_API_KEY = config('UZBEKVOICE_API_KEY', default='')

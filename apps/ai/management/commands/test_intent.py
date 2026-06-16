@@ -16,10 +16,11 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
+from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
-from apps.ai.services import parse_intent
-from apps.ai.services.llm import OllamaClient, OllamaError
+from apps.ai.services import get_llm_client, parse_intent
+from apps.ai.services.base import LLMError
 
 
 TEST_FILE = Path(__file__).resolve().parent.parent.parent / 'test_cases.json'
@@ -43,14 +44,18 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        # Sog'liq tekshiruvi
-        client = OllamaClient()
+        # Sog'liq tekshiruvi — sozlangan provayder (gemini yoki ollama) bo'yicha
+        provider = getattr(settings, 'AI_PROVIDER', 'ollama')
+        client = get_llm_client()
         if not client.health():
             raise CommandError(
-                f'Ollama server ishlamayapti: {client.base_url}\n'
-                f'Ishga tushirish: ollama serve'
+                f'AI provayder "{provider}" ishlamayapti yoki sozlanmagan.\n'
+                f'  - gemini: .env dagi GEMINI_API_KEY to\'g\'ri ekanini tekshiring\n'
+                f'  - ollama: "ollama serve" ishga tushganini tekshiring'
             )
-        self.stdout.write(self.style.SUCCESS(f'[OK] Ollama server: {client.base_url}, model: {client.model}'))
+        self.stdout.write(self.style.SUCCESS(
+            f'[OK] AI provayder: {provider}, model: {getattr(client, "model", "?")}'
+        ))
         self.stdout.write('')
 
         # Bitta matnni sinab ko'rish rejimi
@@ -103,7 +108,7 @@ class Command(BaseCommand):
         start = time.monotonic()
         try:
             result, warnings = parse_intent(text)
-        except OllamaError as e:
+        except LLMError as e:
             self.stdout.write(self.style.ERROR(f'XATO: {e}'))
             return
         elapsed = time.monotonic() - start
@@ -122,7 +127,7 @@ class Command(BaseCommand):
         start = time.monotonic()
         try:
             actual, _warnings = parse_intent(text, today=today)
-        except (OllamaError, ValueError) as e:
+        except (LLMError, ValueError) as e:
             elapsed = time.monotonic() - start
             self.stdout.write(self.style.ERROR(f'#{case_id} [{category}] CRASH: {e}'))
             return False, elapsed
