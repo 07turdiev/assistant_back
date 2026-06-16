@@ -34,7 +34,6 @@ from .i18n import detect_lang, t
 from .keyboards import (
     BTN_HELP,
     BTN_NEW_EVENT,
-    BTN_NEW_TASK,
     confirm_draft_keyboard,
     main_reply_keyboard,
 )
@@ -44,7 +43,6 @@ logger = logging.getLogger(__name__)
 
 class VoiceStates(StatesGroup):
     waiting_voice_for_event = State()
-    waiting_voice_for_task = State()
 
 
 # --------- DB helpers (sync wrapped) ---------
@@ -143,16 +141,6 @@ def _lang(message: Message):
     return detect_lang(code)
 
 
-async def on_button_new_task(message: Message, state: FSMContext):
-    lang = _lang(message)
-    user = await _get_user(message.chat.id)
-    if not user:
-        await message.answer(t('voice.need_login', lang=lang))
-        return
-    await state.set_state(VoiceStates.waiting_voice_for_task)
-    await message.answer(t('voice.send_for_task', lang=lang))
-
-
 async def on_button_new_event(message: Message, state: FSMContext):
     lang = _lang(message)
     user = await _get_user(message.chat.id)
@@ -175,10 +163,7 @@ async def on_voice_message(message: Message, state: FSMContext, bot: Bot):
     """Foydalanuvchi ovoz yuborgan holat — agar `waiting_voice_for_*` state'da bo'lsa."""
     lang = _lang(message)
     current_state = await state.get_state()
-    if current_state not in (
-        VoiceStates.waiting_voice_for_event.state,
-        VoiceStates.waiting_voice_for_task.state,
-    ):
+    if current_state != VoiceStates.waiting_voice_for_event.state:
         await message.answer(
             t('voice.button_first', lang=lang),
             reply_markup=main_reply_keyboard(),
@@ -190,7 +175,7 @@ async def on_voice_message(message: Message, state: FSMContext, bot: Bot):
         await message.answer(t('voice.need_login', lang=lang))
         return
 
-    intent_hint = 'event' if current_state == VoiceStates.waiting_voice_for_event.state else 'task'
+    intent_hint = 'event'
 
     voice = message.voice or message.audio
     if not voice:
@@ -368,7 +353,6 @@ def register_voice_handlers(dp):
 
     Mavjud `apps/telegram_bot/bot.py` `create_dispatcher()` ichidan chaqiriladi.
     """
-    dp.message.register(on_button_new_task, F.text == BTN_NEW_TASK)
     dp.message.register(on_button_new_event, F.text == BTN_NEW_EVENT)
     dp.message.register(on_button_help, F.text == BTN_HELP)
     dp.message.register(

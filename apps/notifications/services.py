@@ -297,6 +297,21 @@ class NotificationService:
                 'message': ws_message,
                 'is_important': False,
             })
+
+        # 3. Telegram — telegram_id bor qabul qiluvchilarga (plain matn)
+        tg_ids = list(
+            User.objects.filter(pk__in=recipient_ids, telegram_id__isnull=False)
+            .values_list('telegram_id', flat=True),
+        )
+        if tg_ids:
+            try:
+                from apps.telegram_bot.notify import send_message as send_tg
+                tg_text = f"{ws_message}\n\n{announcement.description or ''}".strip()
+                for tg_id in tg_ids:
+                    send_tg(tg_id, tg_text, parse_mode='')
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"E'lon Telegram dispatch xatosi: {e}")
+
         return len(recipient_ids)
 
     @classmethod

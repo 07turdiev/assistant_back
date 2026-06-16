@@ -12,7 +12,6 @@ from aiogram.types import (
 
 
 # Tugma matnlari (handler'da ham shu nomlar bo'yicha aniqlaymiz)
-BTN_NEW_TASK = '🎤 Topshiriq berish'
 BTN_NEW_EVENT = '📅 Tadbir yaratish'
 BTN_HELP = 'ℹ️ Yordam'
 
@@ -21,10 +20,7 @@ def main_reply_keyboard() -> ReplyKeyboardMarkup:
     """Asosiy reply klaviatura — autentifikatsiyalangan foydalanuvchilarda doimo ko'rinadi."""
     return ReplyKeyboardMarkup(
         keyboard=[
-            [
-                KeyboardButton(text=BTN_NEW_TASK),
-                KeyboardButton(text=BTN_NEW_EVENT),
-            ],
+            [KeyboardButton(text=BTN_NEW_EVENT)],
             [KeyboardButton(text=BTN_HELP)],
         ],
         resize_keyboard=True,

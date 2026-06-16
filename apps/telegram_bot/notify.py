@@ -27,16 +27,12 @@ def send_message(telegram_id: int, text: str, *, parse_mode: str = 'HTML') -> bo
         return False
 
     url = f'{API_BASE}/bot{token}/sendMessage'
+    payload: dict = {'chat_id': telegram_id, 'text': text}
+    # parse_mode bo'sh bo'lsa — oddiy matn (ixtiyoriy foydalanuvchi matni HTML'ni buzmasligi uchun)
+    if parse_mode:
+        payload['parse_mode'] = parse_mode
     try:
-        resp = requests.post(
-            url,
-            json={
-                'chat_id': telegram_id,
-                'text': text,
-                'parse_mode': parse_mode,
-            },
-            timeout=10,
-        )
+        resp = requests.post(url, json=payload, timeout=10)
         if resp.status_code == 200:
             return True
         logger.warning(f'TG send xatosi (HTTP {resp.status_code}): {resp.text[:200]}')

@@ -16,15 +16,11 @@ DEFAULT_LANG: Lang = 'uz'
 
 
 def detect_lang(language_code: str | None) -> Lang:
-    """Telegram user.language_code asosida — `'uz'`, `'uz-Cyrl'`, yoki `'ru'`."""
-    if not language_code:
-        return DEFAULT_LANG
-    code = language_code.lower()
-    if code.startswith('ru'):
-        return 'ru'
-    if code.startswith('uz') and ('cyr' in code or 'cy' in code):
-        return 'uz-Cyrl'
-    return 'uz'
+    """Bot FAQAT o'zbekcha (lotin) ishlaydi — har doim 'uz'.
+
+    (`language_code` parametri moslik uchun qoldirilgan, lekin e'tiborga olinmaydi.)
+    """
+    return DEFAULT_LANG
 
 
 # Barcha xabarlar shu yerda. Yangi til kerak bo'lsa shu joydan kengaytiriladi.
@@ -72,9 +68,8 @@ MESSAGES: dict[str, dict[Lang, str]] = {
     },
     'login.success': {
         'uz': "✅ Tizimga muvaffaqiyatli kirdingiz!\n\n"
-              "Pastdagi tugmalardan foydalaning yoki ovozli xabar yuboring:\n"
-              "🎤 Topshiriq berish — ovozli buyruq orqali topshiriq qoralamasini yarating\n"
-              "📅 Tadbir yaratish — ovoz orqali tadbir qoralamasini tayyorlang\n\n"
+              "📅 «Tadbir yaratish» tugmasini bosib, ovozli xabar yuboring — "
+              "AI tadbir qoralamasini tayyorlaydi.\n\n"
               "Saytdagi to'liq ko'rinish: {url}",
         'uz-Cyrl': "✅ Тизимга муваффақиятли кирдингиз!\n\n"
                    "Пастдаги тугмалардан фойдаланинг ёки овозли хабар юборинг:\n"
@@ -119,9 +114,8 @@ MESSAGES: dict[str, dict[Lang, str]] = {
     },
     'voice.help': {
         'uz': "ℹ️ Yordamchi\n\n"
-              "🎤 Topshiriq berish — ovozli xabar yuborib tezkor topshiriq bering\n"
-              "📅 Tadbir yaratish — ovoz orqali tadbir qoralamasini tayyorlang\n\n"
-              "Qoralamalar saytda tahrir qilinadi: {url}/drafts",
+              "📅 «Tadbir yaratish» — ovoz orqali tadbir qoralamasini tayyorlang.\n"
+              "Qoralamani saytda ko'rib, tahrirlab joylashtirasiz: {url}/drafts",
         'uz-Cyrl': "ℹ️ Ёрдамчи\n\n"
                    "🎤 Топшириқ бериш — овозли хабар юбориб тезкор топшириқ беринг\n"
                    "📅 Тадбир яратиш — овоз орқали тадбир қораламасини тайёрланг\n\n"
