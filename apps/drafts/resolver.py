@@ -43,12 +43,14 @@ def resolve_intent(
     *,
     intent: dict,
     sender: 'User',
+    raw_text: str = '',
 ) -> ResolveResult:
     """AI intent'ni DB obyektlariga moslashtiradi.
 
     Args:
         intent: parse_intent() natijasi
         sender: ovozli xabarni yuborgan User
+        raw_text: STT chiqargan asl matn ("barcha rahbarlar" kabi iboralarni aniqlash uchun)
 
     Returns:
         ResolveResult — assigned_to, target_direction, suggested_participants va h.k.
@@ -86,6 +88,24 @@ def resolve_intent(
     result.suggested_participants = matched
     result.unresolved_names = unmatched
 
+    # 2.5 "barcha bo'lim rahbarlari" / "hamma boshliqlar" — barcha HEAD'larni avtomatik qo'shamiz
+    scan_text = ' '.join(filter(None, [
+        raw_text,
+        intent.get('description') or '',
+        ' '.join(mentioned_names),
+    ]))
+    all_heads_requested = _wants_all_heads(scan_text)
+    if all_heads_requested:
+        existing_ids = {u.id for u in result.suggested_participants}
+        heads = [h for h in _get_all_heads() if h.id not in existing_ids]
+        result.suggested_participants.extend(heads)
+        # "barcha rahbarlar" deyilgan bo'lsa, AI topa olmagan ismlar shovqindir — tozalaymiz
+        result.unresolved_names = []
+        if heads:
+            result.warnings.append(f"Barcha bo'lim rahbarlari qo'shildi ({len(heads)} ta)")
+        else:
+            result.warnings.append("Bo'lim rahbarlari (HEAD) DB'da topilmadi")
+
     # 3. Agar bo'lim aytilmasdan, oluvchi sender'ning bo'ysunuvchilaridan tanlanadi
     if not result.assigned_to and not target_dept_name:
         subordinates = list(_get_subordinates(sender))
@@ -97,6 +117,9 @@ def resolve_intent(
             result.candidate_subordinates = subordinates
             # Default — birinchisini tayinlaymiz (foydalanuvchi keyin o'zgartirsa bo'ladi)
             result.assigned_to = subordinates[0]
+        elif all_heads_requested:
+            # "Barcha rahbarlar" aytilgan, bo'ysunuvchi yo'q — yuboruvchi o'zi ko'rib joylashtiradi
+            result.assigned_to = sender
         else:
             result.warnings.append(
                 'Sizda bo\'ysunuvchi xodim yo\'q — qoralama uchun oluvchini saytda qo\'lda tanlang'
@@ -161,6 +184,33 @@ def _find_head_of_direction(direction: 'Direction') -> 'User | None':
         role__name=RoleName.HEAD,
         enabled=True,
     ).first()
+
+
+# ---------- "BARCHA RAHBARLAR" ANIQLASH ----------
+
+# "barcha", "hamma" + "rahbar"/"boshliq"/"rais" iboralarini aniqlash uchun kalit so'zlar
+_ALL_WORDS = ('barcha', 'hamma', 'barchasi', 'butun', 'jami')
+_HEAD_WORDS = ('rahbar', 'boshli', 'rais')  # boshli -> boshliq, boshliqlar, boshlig'i
+
+
+def _wants_all_heads(text: str) -> bool:
+    """Matnda "barcha bo'lim rahbarlari" / "hamma boshliqlar" kabi ibora bormi?
+
+    "barcha"/"hamma" + "rahbar"/"boshliq"/"rais" birga uchrasa True qaytaradi.
+    """
+    if not text:
+        return False
+    t = text.lower()
+    return any(w in t for w in _ALL_WORDS) and any(w in t for w in _HEAD_WORDS)
+
+
+def _get_all_heads() -> list:
+    """Barcha faol HEAD (bo'lim boshlig'i) foydalanuvchilarini qaytaradi."""
+    from apps.users.enums import RoleName
+    from apps.users.models import User
+    return list(
+        User.objects.filter(role__name=RoleName.HEAD, enabled=True).order_by('last_name', 'first_name')
+    )
 
 
 # ---------- USER NAME FUZZY MATCH ----------

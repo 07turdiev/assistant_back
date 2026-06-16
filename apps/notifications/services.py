@@ -245,6 +245,18 @@ class NotificationService:
             title = title[:117] + '...'
 
         recipients = User.objects.filter(enabled=True)
+
+        # Auditoriya: bo'lim(lar) tanlangan bo'lsa — faqat o'sha bo'limlar (va MPTT ichidagilar)
+        target_dirs = list(announcement.target_directions.all())
+        if target_dirs:
+            from apps.directions.models import Direction
+            target_qs = Direction.objects.filter(id__in=[d.id for d in target_dirs])
+            all_dir_ids = list(
+                Direction.objects.get_queryset_descendants(target_qs, include_self=True)
+                .values_list('id', flat=True)
+            )
+            recipients = recipients.filter(direction_id__in=all_dir_ids)
+
         if exclude_sender and announcement.sender_id:
             recipients = recipients.exclude(pk=announcement.sender_id)
         recipient_ids = list(recipients.values_list('id', flat=True))

@@ -41,6 +41,12 @@ class Report(AuditMixin):
         null=True, blank=True,
         related_name='reports_received',
     )
+    # Umumiy e'lon auditoriyasi: bo'sh = HAMMAGA, aks holda shu bo'limlar (va ichidagilar)
+    target_directions = models.ManyToManyField(
+        'directions.Direction',
+        blank=True,
+        related_name='announcements',
+    )
     description = models.TextField()
 
     reply = models.CharField(max_length=32, choices=Reply.choices, null=True, blank=True)

@@ -12,6 +12,8 @@ import logging
 from datetime import date
 from typing import Any
 
+from django.conf import settings
+
 from apps.ai.prompts import build_intent_system_prompt
 
 from .base import LLMClient, LLMError, get_llm_client
@@ -62,12 +64,16 @@ def parse_intent(
         intent = _normalize(raw)
         return intent, []
     except (LLMError, ValueError) as e:
-        logger.warning('AI parser yiqildi, fallback ishlatilmoqda: %s', e)
+        # Haqiqiy sabab (xato klassi + xabar) log'ga yoziladi — journalctl orqali ko'rinadi
+        logger.warning('AI parser yiqildi [%s]: %s', type(e).__name__, e)
         fallback = _build_fallback(text, intent_type_hint)
         warnings = [
             'AI tahlilchi javob bermadi — bo\'sh qoralama yaratildi. '
             'Saytda barcha maydonlarni qo\'lda to\'ldiring.',
         ]
+        # Debug rejimi (.env: AI_DEBUG_ERRORS=True) — haqiqiy xatoni foydalanuvchiga ham ko'rsatadi
+        if getattr(settings, 'AI_DEBUG_ERRORS', False):
+            warnings.append(f'🐞 Sabab [{type(e).__name__}]: {e}')
         return fallback, warnings
 
 

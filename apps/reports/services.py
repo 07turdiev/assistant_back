@@ -59,11 +59,19 @@ class ReportService:
 
     @classmethod
     @transaction.atomic
-    def create(cls, *, description: str, sender: User, kind: str = ReportKind.TASK) -> list[Report]:
+    def create(
+        cls,
+        *,
+        description: str,
+        sender: User,
+        kind: str = ReportKind.TASK,
+        target_direction_ids: list | None = None,
+    ) -> list[Report]:
         """`kind` bo'yicha topshiriq (TASK) yoki umumiy e'lon (ANNOUNCEMENT) yaratadi.
 
         - TASK: faqat vazir / bo'lim boshlig'i → yordamchilariga
-        - ANNOUNCEMENT: istalgan foydalanuvchi → hammaga
+        - ANNOUNCEMENT: istalgan foydalanuvchi → hammaga yoki tanlangan bo'limlarga
+          (`target_direction_ids` bo'sh bo'lsa — HAMMAGA)
 
         Returns: yaratilgan Report yozuvlari ro'yxati.
         """
@@ -72,7 +80,7 @@ class ReportService:
             raise ValidationError({'description': "Bo'sh bo'lishi mumkin emas"})
 
         if kind == ReportKind.ANNOUNCEMENT:
-            return cls._create_announcement(description, sender)
+            return cls._create_announcement(description, sender, target_direction_ids)
 
         # Aks holda — topshiriq (faqat Premier/Head)
         if not _is_task_sender(sender):
@@ -128,11 +136,14 @@ class ReportService:
         return reports
 
     @staticmethod
-    def _create_announcement(description: str, sender: User) -> list[Report]:
-        """Istalgan foydalanuvchi → hammaga umumiy e'lon (bitta Report, receiver yo'q).
+    def _create_announcement(
+        description: str, sender: User, target_direction_ids: list | None = None,
+    ) -> list[Report]:
+        """Istalgan foydalanuvchi → umumiy e'lon (bitta Report, receiver yo'q).
 
-        Tarqatish (barcha faol foydalanuvchilarga in-app bildirishnoma + WS) commit'dan
-        keyin bajariladi — mavjud NotificationService.dispatch_announcement orqali.
+        `target_direction_ids` bo'sh bo'lsa — HAMMAGA; aks holda shu bo'limlarga
+        (va MPTT bo'yicha ichidagi bo'limlarga). Tarqatish commit'dan keyin
+        NotificationService.dispatch_announcement orqali bajariladi.
         """
         r = Report.objects.create(
             kind=ReportKind.ANNOUNCEMENT,
@@ -140,6 +151,11 @@ class ReportService:
             receiver=None,
             description=description,
         )
+        if target_direction_ids:
+            from apps.directions.models import Direction
+            dirs = list(Direction.objects.filter(id__in=target_direction_ids))
+            if dirs:
+                r.target_directions.set(dirs)
 
         def _dispatch():
             try:

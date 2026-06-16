@@ -88,7 +88,7 @@ def _create_draft_pipeline(
     elif intent_type_hint == 'task':
         intent['type'] = 'report'
 
-    resolved = resolve_intent(intent=intent, sender=sender)
+    resolved = resolve_intent(intent=intent, sender=sender, raw_text=raw_text)
 
     voice_file = ContentFile(voice_bytes, name=voice_filename)
 

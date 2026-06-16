@@ -1,5 +1,5 @@
 """Reports DRF endpointlari — production ReportController bilan biznes mantiq mos."""
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.http import Http404
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
@@ -63,11 +63,33 @@ class ReportViewSet(viewsets.GenericViewSet):
             qs = qs.exclude(reply__isnull=True)
         return qs.select_related('sender', 'receiver', 'sender__role', 'receiver__role')
 
-    def _announcements_qs(self):
-        """Umumiy e'lonlar — hammaga ko'rinadi (kind=ANNOUNCEMENT, javobsiz)."""
-        return Report.objects.filter(kind=ReportKind.ANNOUNCEMENT).select_related(
-            'sender', 'sender__role',
+    def _announcements_qs(self, user):
+        """Umumiy e'lonlar — auditoriya bo'yicha ko'rinadi.
+
+        - Hammaga (target_directions bo'sh) — har kim ko'radi
+        - Yo'naltirilgan — faqat o'sha bo'lim (yoki uning ichidagi) xodimlari ko'radi
+        - Yuboruvchi o'z e'lonini doim ko'radi; admin/superadmin — hammasini
+        """
+        qs = (
+            Report.objects.filter(kind=ReportKind.ANNOUNCEMENT)
+            .select_related('sender', 'sender__role')
+            .prefetch_related('target_directions')
         )
+        is_admin = user.is_superuser or (user.role and user.role.name in ('SUPER_ADMIN', 'ADMIN'))
+        if is_admin:
+            return qs
+
+        qs = qs.annotate(n_targets=Count('target_directions'))
+        visible = Q(n_targets=0) | Q(sender_id=user.id)  # hammaga + o'zinikilar
+        if user.direction_id:
+            from apps.directions.models import Direction
+            my_dir = Direction.objects.filter(pk=user.direction_id).first()
+            if my_dir:
+                ancestor_ids = list(
+                    my_dir.get_ancestors(include_self=True).values_list('id', flat=True)
+                )
+                visible |= Q(target_directions__id__in=ancestor_ids)
+        return qs.filter(visible).distinct()
 
     # --------- CREATE / REPLY ---------
 
@@ -78,6 +100,7 @@ class ReportViewSet(viewsets.GenericViewSet):
             description=ser.validated_data['description'],
             sender=request.user,
             kind=ser.validated_data.get('kind', ReportKind.TASK),
+            target_direction_ids=ser.validated_data.get('target_direction_ids') or None,
         )
         return Response(
             ReportSerializer(reports, many=True).data,
@@ -128,8 +151,8 @@ class ReportViewSet(viewsets.GenericViewSet):
 
     @action(detail=False, methods=['get'], url_path='announcements')
     def announcements(self, request):
-        """Barcha umumiy e'lonlar — hammaga ko'rinadi, sahifalangan."""
-        qs = self._announcements_qs()
+        """Umumiy e'lonlar — auditoriya bo'yicha ko'rinadi, sahifalangan."""
+        qs = self._announcements_qs(request.user)
         search = request.query_params.get('search')
         if search:
             qs = qs.filter(description__icontains=search)
@@ -141,7 +164,7 @@ class ReportViewSet(viewsets.GenericViewSet):
 
     @action(detail=False, methods=['get'], url_path='announcements/count')
     def announcements_count(self, request):
-        return Response({'count': self._announcements_qs().count()})
+        return Response({'count': self._announcements_qs(request.user).count()})
 
     # --------- DETAIL / UPDATE / DELETE ---------
 

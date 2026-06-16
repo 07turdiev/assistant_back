@@ -217,6 +217,10 @@ DEFAULT_FROM_EMAIL = config('SMTP_FROM', default='') or EMAIL_HOST_USER
 # AI / LLM provayder tanlovi: 'ollama' (lokal) yoki 'gemini' (Google bulut, tezroq)
 AI_PROVIDER = config('AI_PROVIDER', default='ollama')
 
+# Debug: True bo'lsa AI parser xatosining haqiqiy sababini foydalanuvchiga ko'rsatadi
+# (Telegram qoralama xulosasida). Diagnostika uchun vaqtincha yoqing.
+AI_DEBUG_ERRORS = config('AI_DEBUG_ERRORS', default=False, cast=bool)
+
 # AI / LLM (Ollama lokal server)
 OLLAMA_URL = config('OLLAMA_URL', default='http://localhost:11434')
 OLLAMA_MODEL = config('OLLAMA_MODEL', default='qwen3:14b')
