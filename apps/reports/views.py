@@ -6,9 +6,6 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from apps.core.permissions import HasRole
-from apps.users.enums import RoleName
-
 from .enums import ReportKind
 from .models import Report
 from .serializers import (
@@ -18,26 +15,18 @@ from .serializers import (
 )
 from .services import ReportService
 
-ALLOWED_CREATE_ROLES = (
-    RoleName.PREMIER_MINISTER,
-    RoleName.HEAD,
-    RoleName.ASSISTANT,
-    RoleName.ASSISTANT_PREMIER,
-)
-
 
 class ReportViewSet(viewsets.GenericViewSet):
     """Hisobotlar ViewSet.
 
     Frontend kutgan endpointlar:
-    - POST /api/reports/  body {description}
-    - POST /api/reports/reply/  body {report_id, reply?, notify_time?}
+    - POST /api/reports/  body {description, kind?}  (kind=TASK|ANNOUNCEMENT)
+    - POST /api/reports/reply/  body {report_id, reply?, notify_time?}  (faqat TASK)
     - GET  /api/reports/tasks/active/
     - GET  /api/reports/tasks/inactive/?page=&page_size=&search=
     - GET  /api/reports/tasks/count/
-    - GET  /api/reports/requests/active/
-    - GET  /api/reports/requests/inactive/?page=&page_size=&search=
-    - GET  /api/reports/requests/count/
+    - GET  /api/reports/announcements/?page=&page_size=&search=   (hammaga ko'rinadi)
+    - GET  /api/reports/announcements/count/
     - GET  /api/reports/{id}/
     - PUT  /api/reports/{id}/  (sender tahrirlay oladi)
     - DELETE /api/reports/{id}/  (sender o'chira oladi)
@@ -48,18 +37,7 @@ class ReportViewSet(viewsets.GenericViewSet):
     filter_backends = (filters.SearchFilter,)
     search_fields = ('description',)
 
-    def get_permissions(self):
-        if self.action in ('create', 'reply'):
-            return [IsAuthenticated(), HasRole.with_roles(*ALLOWED_CREATE_ROLES)()]
-        return [IsAuthenticated()]
-
     # --------- Helpers ---------
-
-    def _is_task_owner(self, user) -> bool:
-        return bool(user.role and user.role.name in (RoleName.PREMIER_MINISTER, RoleName.HEAD))
-
-    def _is_request_owner(self, user) -> bool:
-        return bool(user.role and user.role.name in (RoleName.ASSISTANT, RoleName.ASSISTANT_PREMIER))
 
     def _visible_user_ids(self, user) -> set:
         """User va uning barcha quyi turuvchilari (rekursiv) ID'lari.
@@ -70,16 +48,14 @@ class ReportViewSet(viewsets.GenericViewSet):
         return set(calendar_user_ids(user))
 
     def _tasks_qs(self, user, *, active: bool):
-        """User'ning task'lari — o'zi YOKI quyi turuvchilari ishtirok etgan tasklar.
+        """User'ning topshiriqlari — o'zi YOKI quyi turuvchilari ishtirok etgan tasklar.
 
-        Sender Premier/Head bo'lishi shart (task'ning roli).
         Vazirga butun tashkilot bo'yicha topshiriqlar ko'rinadi.
         """
-        task_sender_roles = (RoleName.PREMIER_MINISTER, RoleName.HEAD)
         visible = self._visible_user_ids(user)
         qs = Report.objects.filter(
             Q(sender_id__in=visible) | Q(receiver_id__in=visible),
-            sender__role__name__in=task_sender_roles,
+            kind=ReportKind.TASK,
         )
         if active:
             qs = qs.filter(reply__isnull=True)
@@ -87,22 +63,11 @@ class ReportViewSet(viewsets.GenericViewSet):
             qs = qs.exclude(reply__isnull=True)
         return qs.select_related('sender', 'receiver', 'sender__role', 'receiver__role')
 
-    def _requests_qs(self, user, *, active: bool):
-        """Request'lar — o'zi YOKI quyi turuvchilari ishtirok etgan so'rovlar.
-
-        Sender Assistant/AssistantPremier bo'lishi shart.
-        """
-        request_sender_roles = (RoleName.ASSISTANT, RoleName.ASSISTANT_PREMIER)
-        visible = self._visible_user_ids(user)
-        qs = Report.objects.filter(
-            Q(sender_id__in=visible) | Q(receiver_id__in=visible),
-            sender__role__name__in=request_sender_roles,
+    def _announcements_qs(self):
+        """Umumiy e'lonlar — hammaga ko'rinadi (kind=ANNOUNCEMENT, javobsiz)."""
+        return Report.objects.filter(kind=ReportKind.ANNOUNCEMENT).select_related(
+            'sender', 'sender__role',
         )
-        if active:
-            qs = qs.filter(reply__isnull=True)
-        else:
-            qs = qs.exclude(reply__isnull=True)
-        return qs.select_related('sender', 'receiver', 'sender__role', 'receiver__role')
 
     # --------- CREATE / REPLY ---------
 
@@ -112,6 +77,7 @@ class ReportViewSet(viewsets.GenericViewSet):
         reports = ReportService.create(
             description=ser.validated_data['description'],
             sender=request.user,
+            kind=ser.validated_data.get('kind', ReportKind.TASK),
         )
         return Response(
             ReportSerializer(reports, many=True).data,
@@ -158,16 +124,12 @@ class ReportViewSet(viewsets.GenericViewSet):
     def tasks_count(self, request):
         return Response({'count': self._tasks_qs(request.user, active=True).count()})
 
-    # --------- REQUESTS ---------
+    # --------- ANNOUNCEMENTS (umumiy e'lonlar) ---------
 
-    @action(detail=False, methods=['get'], url_path='requests/active')
-    def requests_active(self, request):
-        qs = self._requests_qs(request.user, active=True)
-        return Response(ReportSerializer(qs, many=True).data)
-
-    @action(detail=False, methods=['get'], url_path='requests/inactive')
-    def requests_inactive(self, request):
-        qs = self._requests_qs(request.user, active=False)
+    @action(detail=False, methods=['get'], url_path='announcements')
+    def announcements(self, request):
+        """Barcha umumiy e'lonlar — hammaga ko'rinadi, sahifalangan."""
+        qs = self._announcements_qs()
         search = request.query_params.get('search')
         if search:
             qs = qs.filter(description__icontains=search)
@@ -177,9 +139,9 @@ class ReportViewSet(viewsets.GenericViewSet):
             return self.get_paginated_response(ser.data)
         return Response(ser.data)
 
-    @action(detail=False, methods=['get'], url_path='requests/count')
-    def requests_count(self, request):
-        return Response({'count': self._requests_qs(request.user, active=True).count()})
+    @action(detail=False, methods=['get'], url_path='announcements/count')
+    def announcements_count(self, request):
+        return Response({'count': self._announcements_qs().count()})
 
     # --------- DETAIL / UPDATE / DELETE ---------
 
@@ -190,8 +152,9 @@ class ReportViewSet(viewsets.GenericViewSet):
             ).get(pk=pk)
         except Report.DoesNotExist as exc:
             raise Http404 from exc
-        # Faqat ishtirokchilar (sender / receiver / superuser)
-        if r.sender_id != request.user.id and r.receiver_id != request.user.id \
+        # E'lon — hammaga ochiq; topshiriq — faqat ishtirokchilar (sender/receiver/superuser)
+        if r.kind != ReportKind.ANNOUNCEMENT \
+                and r.sender_id != request.user.id and r.receiver_id != request.user.id \
                 and not request.user.is_superuser:
             return Response({'success': False, 'message': 'Ruxsat yo\'q'},
                             status=status.HTTP_403_FORBIDDEN)

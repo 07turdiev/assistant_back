@@ -229,6 +229,59 @@ class NotificationService:
             })
 
     @classmethod
+    def dispatch_announcement(cls, announcement, *, exclude_sender: bool = True) -> int:
+        """Umumiy e'lon — barcha faol foydalanuvchilarga in-app bildirishnoma + WS.
+
+        Mavjud bildirishnoma tizimini qayta ishlatadi: har foydalanuvchiga `Notification`
+        yoziladi (qo'ng'iroqcha + o'qilmagan badge + per-user "seen" avtomatik ishlaydi)
+        va `notify` kanali orqali real-time WS push yuboriladi.
+
+        SMS/Email YUBORILMAYDI — umumiy e'lon spam bo'lmasligi uchun.
+
+        Returns: xabardor qilingan foydalanuvchilar soni.
+        """
+        title = (announcement.description or '').strip()
+        if len(title) > 120:
+            title = title[:117] + '...'
+
+        recipients = User.objects.filter(enabled=True)
+        if exclude_sender and announcement.sender_id:
+            recipients = recipients.exclude(pk=announcement.sender_id)
+        recipient_ids = list(recipients.values_list('id', flat=True))
+        if not recipient_ids:
+            return 0
+
+        sender = announcement.sender
+        sender_name = ''
+        if sender:
+            sender_name = ' '.join(filter(None, [sender.last_name, sender.first_name])) or sender.username
+
+        # 1. DB — har foydalanuvchiga Notification (bulk INSERT)
+        Notification.objects.bulk_create([
+            Notification(
+                user_id=uid,
+                title=title or "E'lon",
+                notification_type=NotificationType.ANNOUNCEMENT,
+                is_important=False,
+                seen=False,
+            )
+            for uid in recipient_ids
+        ])
+
+        # 2. WS real-time push — `notify` kanali orqali qo'ng'iroqchaga
+        ws_message = "📢 Yangi e'lon" + (f' — {sender_name}' if sender_name else '')
+        for uid in recipient_ids:
+            _send_websocket(uid, {
+                'channel': 'notify',
+                'type': NotificationType.ANNOUNCEMENT,
+                'title': title or "E'lon",
+                'report_id': str(announcement.id),
+                'message': ws_message,
+                'is_important': False,
+            })
+        return len(recipient_ids)
+
+    @classmethod
     def send_test_to_user(cls, user) -> int:
         """`POST /api/webpush/test/` — har bir subscription'ga test push."""
         return send_webpush_to_user(

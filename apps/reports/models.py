@@ -3,20 +3,31 @@ from django.db import models
 
 from apps.core.models import AuditMixin
 
-from .enums import Reply
+from .enums import Reply, ReportKind
 
 
 class Report(AuditMixin):
-    """Hisobot — task yoki request (sender roliga qarab).
+    """Hisobot — topshiriq (task) yoki e'lon (announcement).
 
-    Production sxemasi:
-    - sender (User), receiver (User, nullable)
+    - **TASK**: Premier/Head → yordamchilariga (1:1, receiver bor, javobli)
+    - **ANNOUNCEMENT**: istalgan foydalanuvchi → hammaga (receiver yo'q, javobsiz)
+
+    Maydonlar:
+    - kind (TASK | ANNOUNCEMENT | REQUEST-legacy)
+    - sender (User), receiver (User, nullable — e'londa yo'q)
     - description (text)
-    - reply (Reply enum, nullable — javob hali kelmagan bo'lishi mumkin)
+    - reply (Reply enum, nullable — faqat task uchun)
     - reply_at (DateTime, nullable)
     - notify_time (Integer, nullable — eslatma vaqti minutlarda)
     - seen (Boolean)
     """
+
+    kind = models.CharField(
+        max_length=16,
+        choices=ReportKind.choices,
+        default=ReportKind.TASK,
+        db_index=True,
+    )
 
     sender = models.ForeignKey(
         'users.User',

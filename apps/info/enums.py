@@ -65,6 +65,7 @@ class NotificationType(models.TextChoices):
     DELETED = 'DELETED', 'Bekor qilindi'
     REMINDED = 'REMINDED', 'Eslatma'
     PRE_EVENT = 'PRE_EVENT', "Boshlang'ich tadbir"
+    ANNOUNCEMENT = 'ANNOUNCEMENT', "E'lon"
 
 
 class TgState(models.TextChoices):

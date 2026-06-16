@@ -34,9 +34,8 @@ from .models import Report
 logger = logging.getLogger(__name__)
 
 
-# Sender roli bo'yicha aniqlash
+# Topshiriq (TASK) faqat shu rollar tomonidan beriladi
 TASK_SENDER_ROLES = (RoleName.PREMIER_MINISTER, RoleName.HEAD)
-REQUEST_SENDER_ROLES = (RoleName.ASSISTANT, RoleName.ASSISTANT_PREMIER)
 
 
 def _send_ws(user_id, payload: dict) -> None:
@@ -56,16 +55,15 @@ def _is_task_sender(user: User) -> bool:
     return bool(user.role and user.role.name in TASK_SENDER_ROLES)
 
 
-def _is_request_sender(user: User) -> bool:
-    return bool(user.role and user.role.name in REQUEST_SENDER_ROLES)
-
-
 class ReportService:
 
     @classmethod
     @transaction.atomic
-    def create(cls, *, description: str, sender: User) -> list[Report]:
-        """Sender roliga qarab task yoki request yaratadi.
+    def create(cls, *, description: str, sender: User, kind: str = ReportKind.TASK) -> list[Report]:
+        """`kind` bo'yicha topshiriq (TASK) yoki umumiy e'lon (ANNOUNCEMENT) yaratadi.
+
+        - TASK: faqat vazir / bo'lim boshlig'i → yordamchilariga
+        - ANNOUNCEMENT: istalgan foydalanuvchi → hammaga
 
         Returns: yaratilgan Report yozuvlari ro'yxati.
         """
@@ -73,12 +71,13 @@ class ReportService:
         if not description:
             raise ValidationError({'description': "Bo'sh bo'lishi mumkin emas"})
 
-        if _is_task_sender(sender):
-            return cls._create_tasks(description, sender)
-        elif _is_request_sender(sender):
-            return cls._create_request(description, sender)
-        else:
-            raise PermissionDenied("Bu rolga task yoki request yaratish ruxsat yo'q")
+        if kind == ReportKind.ANNOUNCEMENT:
+            return cls._create_announcement(description, sender)
+
+        # Aks holda — topshiriq (faqat Premier/Head)
+        if not _is_task_sender(sender):
+            raise PermissionDenied("Topshiriq berish faqat vazir va bo'lim boshliqlariga ruxsat")
+        return cls._create_tasks(description, sender)
 
     @staticmethod
     def _create_tasks(description: str, sender: User) -> list[Report]:
@@ -90,7 +89,7 @@ class ReportService:
         reports = []
         for assistant in assistants:
             r = Report.objects.create(
-                sender=sender, receiver=assistant, description=description,
+                kind=ReportKind.TASK, sender=sender, receiver=assistant, description=description,
             )
             reports.append(r)
             _send_ws(assistant.id, {
@@ -129,47 +128,27 @@ class ReportService:
         return reports
 
     @staticmethod
-    def _create_request(description: str, sender: User) -> list[Report]:
-        """Assistant → rahbariga (bitta Report)."""
-        if not sender.chief_id:
-            raise ValidationError("Sizning rahbaringiz aniqlanmagan")
-        chief = sender.chief
-        if not chief or not chief.enabled:
-            raise ValidationError("Rahbar topilmadi yoki nofaol")
+    def _create_announcement(description: str, sender: User) -> list[Report]:
+        """Istalgan foydalanuvchi → hammaga umumiy e'lon (bitta Report, receiver yo'q).
 
-        r = Report.objects.create(sender=sender, receiver=chief, description=description)
-        _send_ws(chief.id, {
-            'channel': 'report',
-            'type': 'Request',
-            'message': "Tezkor so'rov!",
-            'report_id': str(r.id),
-        })
-        sms_text = f"Tezkor so'rov!\n\n{description}"
+        Tarqatish (barcha faol foydalanuvchilarga in-app bildirishnoma + WS) commit'dan
+        keyin bajariladi — mavjud NotificationService.dispatch_announcement orqali.
+        """
+        r = Report.objects.create(
+            kind=ReportKind.ANNOUNCEMENT,
+            sender=sender,
+            receiver=None,
+            description=description,
+        )
 
-        # Telegram chief'ga
-        if chief.telegram_id:
+        def _dispatch():
             try:
-                from apps.telegram_bot.notify import send_message as send_tg
-                send_tg(chief.telegram_id, f"📨 {sms_text}")
+                from apps.notifications.services import NotificationService
+                NotificationService.dispatch_announcement(r)
             except Exception as e:  # noqa: BLE001
-                logger.warning(f'TG dispatch xatosi: {e}')
+                logger.warning(f"E'lon tarqatish xatosi: {e}")
 
-        # SMS chief'ga
-        if chief.phone_number:
-            try:
-                from apps.notifications.sms import send_to_many as send_sms
-                send_sms([chief.phone_number.strip()], sms_text)
-            except Exception as e:  # noqa: BLE001
-                logger.warning(f'Report SMS dispatch xatosi: {e}')
-
-        # Email chief'ga
-        if chief.email:
-            try:
-                from apps.notifications.email import send_to_many as send_email
-                send_email([chief.email], sms_text, subject="Tezkor so'rov")
-            except Exception as e:  # noqa: BLE001
-                logger.warning(f'Report Email dispatch xatosi: {e}')
-
+        transaction.on_commit(_dispatch)
         return [r]
 
     @classmethod
@@ -181,6 +160,9 @@ class ReportService:
         - reply yoki notify_time'dan kamida biri bo'lishi shart
         - faqat receiver javob bera oladi
         """
+        if report.kind == ReportKind.ANNOUNCEMENT:
+            raise ValidationError("E'longa javob berilmaydi")
+
         if report.receiver_id != user.id and not user.is_superuser:
             raise PermissionDenied("Faqat hisobot oluvchi javob bera oladi")
 

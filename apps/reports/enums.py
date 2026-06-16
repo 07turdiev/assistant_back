@@ -30,7 +30,8 @@ REPLY_META = {
 }
 
 
-# Hisobot turi (sender roli bo'yicha aniqlanadi)
-class ReportKind:
-    TASK = 'TASK'        # Premier/Head → yordamchiga
-    REQUEST = 'REQUEST'  # Assistant → rahbariga
+# Hisobot turi
+class ReportKind(models.TextChoices):
+    TASK = 'TASK', 'Topshiriq'              # Premier/Head → yordamchiga (1:1, javobli)
+    ANNOUNCEMENT = 'ANNOUNCEMENT', "E'lon"  # Istalgan foydalanuvchi → hammaga (umumiy taxta)
+    REQUEST = 'REQUEST', "So'rov"           # Legacy — eski yozuvlar uchun (endi yaratilmaydi)

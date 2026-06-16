@@ -2,6 +2,7 @@ from rest_framework import serializers
 
 from apps.users.serializers import UserShortSerializer
 
+from .enums import ReportKind
 from .models import Report
 
 
@@ -12,17 +13,23 @@ class ReportSerializer(serializers.ModelSerializer):
     class Meta:
         model = Report
         fields = (
-            'id', 'description',
+            'id', 'kind', 'description',
             'sender', 'receiver',
             'reply', 'reply_at', 'notify_time', 'seen',
             'created_at', 'updated_at',
         )
-        read_only_fields = ('id', 'sender', 'receiver', 'reply', 'reply_at',
+        read_only_fields = ('id', 'kind', 'sender', 'receiver', 'reply', 'reply_at',
                             'notify_time', 'seen', 'created_at', 'updated_at')
 
 
 class ReportCreateSerializer(serializers.Serializer):
     description = serializers.CharField()
+    # TASK (topshiriq) yoki ANNOUNCEMENT (e'lon). Berilmasa — topshiriq.
+    kind = serializers.ChoiceField(
+        choices=[ReportKind.TASK, ReportKind.ANNOUNCEMENT],
+        default=ReportKind.TASK,
+        required=False,
+    )
 
 
 class ReplyInputSerializer(serializers.Serializer):
