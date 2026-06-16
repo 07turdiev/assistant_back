@@ -48,7 +48,8 @@ class ReportViewSet(viewsets.GenericViewSet):
             return qs
 
         qs = qs.annotate(n_targets=Count('target_directions'))
-        visible = Q(n_targets=0) | Q(sender_id=user.id)  # hammaga + o'zinikilar
+        # hammaga + o'zi yuborgan (rahbar) + o'zi yaratgan (yordamchi nomidan)
+        visible = Q(n_targets=0) | Q(sender_id=user.id) | Q(created_by_id=user.id)
         if user.direction_id:
             from apps.directions.models import Direction
             my_dir = Direction.objects.filter(pk=user.direction_id).first()
@@ -83,7 +84,7 @@ class ReportViewSet(viewsets.GenericViewSet):
         if search:
             qs = qs.filter(description__icontains=search)
         page = self.paginate_queryset(qs)
-        ser = ReportSerializer(page or qs, many=True)
+        ser = ReportSerializer(page or qs, many=True, context={'request': request})
         if page is not None:
             return self.get_paginated_response(ser.data)
         return Response(ser.data)
@@ -104,29 +105,40 @@ class ReportViewSet(viewsets.GenericViewSet):
                 and r.sender_id != request.user.id and not request.user.is_superuser:
             return Response({'success': False, 'message': 'Ruxsat yo\'q'},
                             status=status.HTTP_403_FORBIDDEN)
-        return Response(ReportSerializer(r).data)
+        return Response(ReportSerializer(r, context={'request': request}).data)
 
     def update(self, request, pk=None):
         try:
             r = Report.objects.get(pk=pk)
         except Report.DoesNotExist as exc:
             raise Http404 from exc
-        if r.sender_id != request.user.id and not request.user.is_superuser:
-            return Response({'success': False, 'message': "Faqat yuboruvchi tahrirlay oladi"},
+        if not self._can_manage(request.user, r):
+            return Response({'success': False, 'message': "Faqat muallif yoki uning yordamchisi tahrirlay oladi"},
                             status=status.HTTP_403_FORBIDDEN)
         description = request.data.get('description')
         if description:
             r.description = description
             r.save(update_fields=['description', 'updated_at', 'updated_by'])
-        return Response(ReportSerializer(r).data)
+        return Response(ReportSerializer(r, context={'request': request}).data)
 
     def destroy(self, request, pk=None):
         try:
             r = Report.objects.get(pk=pk)
         except Report.DoesNotExist as exc:
             raise Http404 from exc
-        if r.sender_id != request.user.id and not request.user.is_superuser:
-            return Response({'success': False, 'message': "Faqat yuboruvchi o'chira oladi"},
+        if not self._can_manage(request.user, r):
+            return Response({'success': False, 'message': "Faqat muallif yoki uning yordamchisi o'chira oladi"},
                             status=status.HTTP_403_FORBIDDEN)
         r.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @staticmethod
+    def _can_manage(user, report) -> bool:
+        """E'lonni tahrirlash/o'chirish ruxsati: rahbar (sender), uning yordamchisi,
+        asl yaratuvchi yoki superuser."""
+        from apps.users.delegation import can_act_as
+        return (
+            user.is_superuser
+            or can_act_as(user, report.sender_id)
+            or report.created_by_id == user.id
+        )

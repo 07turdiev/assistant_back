@@ -10,7 +10,6 @@ from apps.attachments.models import Attachment
 from apps.attachments.services import remove_attachment, secure_upload
 from apps.directions.models import Direction
 from apps.info.enums import NotificationType
-from apps.users.enums import RoleName
 from apps.users.models import User
 
 from .models import Event, EventParticipant, Visitor
@@ -112,9 +111,8 @@ class EventService:
     @staticmethod
     def _resolve_on_behalf_of(user: User):
         """Kim nomidan: yordamchi yaratsa — uning rahbari (vazir/o'rinbosar); aks holda — o'zi."""
-        if user.role and user.role.name == RoleName.YORDAMCHI and user.chief_id:
-            return user.chief
-        return user
+        from apps.users.delegation import resolve_principal
+        return resolve_principal(user)
 
     @staticmethod
     def _resolve_direction(user: User, direction_id, fallback_directions=None):

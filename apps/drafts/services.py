@@ -16,6 +16,7 @@ from django.utils import timezone
 
 from apps.events.models import Event, EventParticipant
 from apps.reports.models import Report
+from apps.users.delegation import resolve_principal
 
 from .enums import DraftSource, DraftStatus
 from .models import EventDraft, ReportDraft
@@ -166,8 +167,9 @@ def publish_event_draft(draft: EventDraft) -> Event:
         direction=direction,
         speaker=draft.speaker,
         notify_time=draft.notify_minutes_before,
-        # Ovozni yuborgan (vazir/o'rinbosar) nomidan — yordamchi joylasa ham
-        on_behalf_of=draft.created_by,
+        # Ovozni yuborgan (vazir/o'rinbosar) nomidan — yordamchi joylasa ham.
+        # resolve_principal: yaratuvchi yordamchi bo'lsa ham uning rahbariga keltiriladi.
+        on_behalf_of=resolve_principal(draft.created_by),
     )
 
     # Qatnashchilar — aytilgan odamlar + yo'naltirilgan bo'lim boshlig'i
@@ -198,7 +200,7 @@ def publish_report_draft(draft: ReportDraft) -> Report:
         raise ValidationError('Topshiriq matni (description) bo\'sh')
 
     report = Report.objects.create(
-        sender=draft.created_by,
+        sender=resolve_principal(draft.created_by),
         receiver=draft.assigned_to,
         description=draft.description,
         notify_time=(draft.notify_minutes_before or [None])[0],

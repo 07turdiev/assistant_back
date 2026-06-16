@@ -37,9 +37,13 @@ class ReportService:
     def _create_announcement(
         description: str, sender: User, target_direction_ids: list | None = None,
     ) -> list[Report]:
+        # Delegatsiya: yordamchi yaratsa — e'lon RAHBARI (vazir/o'rinbosar) nomidan ketadi.
+        # Asl yaratuvchi `created_by`'da (AuditMixin orqali) audit sifatida saqlanadi.
+        from apps.users.delegation import resolve_principal
+        principal = resolve_principal(sender)
         r = Report.objects.create(
             kind=ReportKind.ANNOUNCEMENT,
-            sender=sender,
+            sender=principal,
             receiver=None,
             description=description,
         )

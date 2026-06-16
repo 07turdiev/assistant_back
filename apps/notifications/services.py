@@ -263,8 +263,14 @@ class NotificationService:
             )
             recipients = recipients.filter(direction_id__in=all_dir_ids)
 
+        # Muallif (sender=rahbar) va asl yaratuvchi (created_by=yordamchi) o'ziga e'lon olmaydi
+        exclude_ids = set()
         if exclude_sender and announcement.sender_id:
-            recipients = recipients.exclude(pk=announcement.sender_id)
+            exclude_ids.add(announcement.sender_id)
+        if announcement.created_by_id:
+            exclude_ids.add(announcement.created_by_id)
+        if exclude_ids:
+            recipients = recipients.exclude(pk__in=exclude_ids)
         recipient_ids = list(recipients.values_list('id', flat=True))
         if not recipient_ids:
             return 0
