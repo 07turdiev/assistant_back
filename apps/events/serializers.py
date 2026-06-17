@@ -123,10 +123,19 @@ class EventInputSerializer(serializers.Serializer):
 
 
 class EventForwardSerializer(serializers.Serializer):
-    """Boshliq tadbirni o'z quyi xodimlariga yo'naltirishi (delegatsiya)."""
+    """Boshliq tadbirni o'z quyi xodimlari yoki quyi bo'limlariga yo'naltirishi (delegatsiya)."""
     subordinate_ids = serializers.ListField(
-        child=serializers.UUIDField(), allow_empty=False,
+        child=serializers.UUIDField(), required=False, default=list,
     )
+    # Quyi bo'limlar — har birining boshlig'i qatnashchi bo'lib qo'shiladi (u yana yo'naltira oladi)
+    direction_ids = serializers.ListField(
+        child=serializers.UUIDField(), required=False, default=list,
+    )
+
+    def validate(self, attrs):
+        if not (attrs.get('subordinate_ids') or attrs.get('direction_ids')):
+            raise serializers.ValidationError("Xodim yoki bo'lim tanlang")
+        return attrs
 
 
 class EventParticipantSerializer(serializers.ModelSerializer):

@@ -145,7 +145,8 @@ class EventViewSet(viewsets.ModelViewSet):
         added = EventService.forward_to_subordinates(
             event,
             user=request.user,
-            subordinate_ids=ser.validated_data['subordinate_ids'],
+            subordinate_ids=ser.validated_data.get('subordinate_ids'),
+            direction_ids=ser.validated_data.get('direction_ids'),
         )
         return Response({'success': True, 'added': added,
                          'message': f'{added} ta xodim qo\'shildi'})

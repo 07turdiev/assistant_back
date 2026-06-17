@@ -275,6 +275,21 @@ class NotificationService:
         if not recipient_ids:
             return 0
 
+        # Proksi: har bir qabul qiluvchining yordamchisi (YORDAMCHI, chief=qabul qiluvchi)
+        # ham e'lonni oladi — "ikkala hisob bir xil" (muallif/yaratuvchidan tashqari).
+        from apps.users.enums import RoleName
+        assistant_ids = list(
+            User.objects.filter(
+                chief_id__in=recipient_ids,
+                role__name=RoleName.YORDAMCHI,
+                enabled=True,
+            )
+            .exclude(pk__in=exclude_ids)
+            .values_list('id', flat=True),
+        )
+        if assistant_ids:
+            recipient_ids = list(dict.fromkeys([*recipient_ids, *assistant_ids]))
+
         sender = announcement.sender
         sender_name = ''
         if sender:

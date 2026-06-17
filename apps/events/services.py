@@ -266,25 +266,50 @@ class EventService:
 
     @classmethod
     @transaction.atomic
-    def forward_to_subordinates(cls, event: Event, *, user: User, subordinate_ids: list) -> int:
-        """Boshliq tadbirni o'z quyi xodimlariga yo'naltiradi (ularni qatnashchi qiladi).
+    def forward_to_subordinates(
+        cls, event: Event, *, user: User, subordinate_ids=None, direction_ids=None,
+    ) -> int:
+        """Boshliq tadbirni o'z quyi xodimlari yoki quyi bo'limlariga yo'naltiradi.
 
         - Faqat tadbir qatnashchisi (yoki yaratuvchi/superuser) yo'naltira oladi
-        - Faqat o'zining quyi xodimlarini qo'sha oladi (chief=user)
+        - Xodimlar: faqat o'zining quyi xodimlari (chief=user)
+        - Bo'limlar: faqat o'z bo'limidan past (MPTT descendants) — har birining boshlig'i
+          qatnashchi bo'ladi (u keyin yana o'z quyi bo'limlariga yo'naltira oladi)
         - Yangi qo'shilganlargagina bildirishnoma yuboriladi
         """
         is_participant = event.participant_links.filter(user_id=user.id).exists()
         if not is_participant and event.created_by_id != user.id and not user.is_superuser:
             raise PermissionDenied("Faqat tadbir qatnashchisi yo'naltira oladi")
 
-        valid_subs = list(
-            User.objects.filter(pk__in=subordinate_ids or [], chief_id=user.id, enabled=True),
-        )
-        if not valid_subs:
-            raise ValidationError("Yo'naltirish uchun o'z xodimlaringizdan tanlang")
+        seen = set(event.participants.values_list('id', flat=True))
+        to_add: list = []
 
-        existing = set(event.participants.values_list('id', flat=True))
-        to_add = [u for u in valid_subs if u.id not in existing]
+        # 1) To'g'ridan-to'g'ri xodimlar (chief=user)
+        if subordinate_ids:
+            for u in User.objects.filter(pk__in=subordinate_ids, chief_id=user.id, enabled=True):
+                if u.id not in seen:
+                    seen.add(u.id)
+                    to_add.append(u)
+
+        # 2) Quyi bo'limlar — boshlig'ini qatnashchi qilamiz (faqat o'z bo'limidan past)
+        if direction_ids:
+            dirs = list(
+                Direction.objects.filter(pk__in=direction_ids).select_related('head'),
+            )
+            if user.direction_id:
+                allowed = set(
+                    Direction.objects.get_queryset_descendants(
+                        Direction.objects.filter(pk=user.direction_id), include_self=False,
+                    ).values_list('id', flat=True),
+                )
+                dirs = [d for d in dirs if d.id in allowed]
+            for d in dirs:
+                event.participant_directions.add(d)  # ko'rsatish uchun
+                head = d.head if (d.head_id and d.head and d.head.enabled) else None
+                if head and head.id not in seen:
+                    seen.add(head.id)
+                    to_add.append(head)
+
         if not to_add:
             return 0
 
@@ -344,9 +369,13 @@ def calendar_user_ids(user: User) -> list:
     Misol: Vazir → barcha tashkilot xodimlari ko'rinadi.
             Bo'lim boshlig'i → o'zi va bo'limining barcha xodimlari.
             Bosh mutaxassis → faqat o'zi (yordamchisi bo'lmasa).
+
+    Delegatsiya: YORDAMCHI o'z rahbari (chief) kabi ko'radi — "ikkala hisob bir xil".
     """
-    ids = {user.id}
-    frontier = {user.id}
+    from apps.users.delegation import resolve_principal
+    base = resolve_principal(user)  # yordamchi bo'lsa — boshliq qamrovi
+    ids = {base.id, user.id}
+    frontier = {base.id}
     # BFS — har qadamda yangi level subordinate'larni topib qo'shamiz
     while frontier:
         subs = set(

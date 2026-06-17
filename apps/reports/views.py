@@ -48,15 +48,25 @@ class ReportViewSet(viewsets.GenericViewSet):
             return qs
 
         qs = qs.annotate(n_targets=Count('target_directions'))
-        # hammaga + o'zi yuborgan (rahbar) + o'zi yaratgan (yordamchi nomidan)
-        visible = Q(n_targets=0) | Q(sender_id=user.id) | Q(created_by_id=user.id)
-        if user.direction_id:
-            from apps.directions.models import Direction
-            my_dir = Direction.objects.filter(pk=user.direction_id).first()
-            if my_dir:
-                ancestor_ids = list(
-                    my_dir.get_ancestors(include_self=True).values_list('id', flat=True)
-                )
+        from apps.directions.models import Direction
+        from apps.users.delegation import resolve_principal
+
+        # "Ikkala hisob bir xil": yordamchi bo'lsa, boshliq ko'rgan e'lonlarni ham ko'radi.
+        principal = resolve_principal(user)
+        viewer_ids = {user.id, principal.id}
+
+        # hammaga + o'zi/boshliq yuborgan + o'zi yaratgan
+        visible = Q(n_targets=0) | Q(sender_id__in=viewer_ids) | Q(created_by_id=user.id)
+
+        # Yo'naltirilgan e'lonlar — foydalanuvchi yoki boshliqning bo'lim ajdodlari bo'yicha
+        dir_ids = [d for d in (user.direction_id, principal.direction_id) if d]
+        if dir_ids:
+            dirs = Direction.objects.filter(pk__in=dir_ids)
+            ancestor_ids = list(
+                Direction.objects.get_queryset_ancestors(dirs, include_self=True)
+                .values_list('id', flat=True),
+            )
+            if ancestor_ids:
                 visible |= Q(target_directions__id__in=ancestor_ids)
         return qs.filter(visible).distinct()
 

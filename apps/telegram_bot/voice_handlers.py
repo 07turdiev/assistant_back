@@ -227,12 +227,18 @@ async def on_voice_message(message: Message, state: FSMContext, bot: Bot):
         reply_markup=confirm_draft_keyboard(draft_kind, str(draft.id)),
     )
 
-    # 5. Quyi xodimga ogohlantirish
-    if draft.assigned_to and draft.assigned_to.telegram_id:
+    # 5. Yordamchiga ogohlantirish — boshliq ovoz yuborsa, uning yordamchisi
+    #    "topshiriq berdi" xabarini oladi. (Yordamchi yo'q bo'lsa assigned_to == created_by —
+    #    o'ziga takror yubormaymiz.)
+    if (
+        draft.assigned_to
+        and draft.assigned_to.telegram_id
+        and draft.assigned_to_id != draft.created_by_id
+    ):
         try:
             await _notify_assignee(bot, draft, draft_kind, transcript)
         except Exception:
-            logger.exception('Quyi xodim botiga xabar yuborishda xato')
+            logger.exception('Yordamchi botiga xabar yuborishda xato')
 
 
 async def _stt_transcribe(voice_bytes: bytes, filename: str) -> str:

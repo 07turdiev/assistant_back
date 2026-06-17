@@ -42,16 +42,35 @@ class UserMeSerializer(UserShortSerializer):
     direction_id = serializers.UUIDField(read_only=True, allow_null=True)
     organisation_id = serializers.SerializerMethodField()
     chief_id = serializers.UUIDField(read_only=True, allow_null=True)
+    # Yordamchi bo'lsa — rahbarining qisqa ma'lumoti ("[rahbar] nomidan" banneri uchun)
+    chief = serializers.SerializerMethodField()
 
     class Meta(UserShortSerializer.Meta):
         fields = UserShortSerializer.Meta.fields + (
-            'direction_id', 'organisation_id', 'chief_id', 'office_number', 'company_car',
+            'direction_id', 'organisation_id', 'chief_id', 'chief', 'office_number', 'company_car',
         )
 
     def get_organisation_id(self, obj: User):
         if obj.direction and obj.direction.organisation_id:
             return str(obj.direction.organisation_id)
         return None
+
+    def get_chief(self, obj: User):
+        from apps.users.enums import RoleName
+        c = getattr(obj, 'chief', None)
+        if not (obj.role and obj.role.name == RoleName.YORDAMCHI and c):
+            return None
+        role = getattr(c, 'role', None)
+        return {
+            'id': str(c.id),
+            'first_name': c.first_name,
+            'last_name': c.last_name,
+            'father_name': c.father_name or '',
+            'position_uz': c.position_uz or '',
+            'position_ru': c.position_ru or '',
+            'role_label_uz': role.label_uz if role else '',
+            'role_label_ru': role.label_ru if role else '',
+        }
 
 
 class UserAdminSerializer(UserShortSerializer):
