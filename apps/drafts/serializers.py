@@ -42,7 +42,6 @@ class _DraftBaseSerializer(serializers.ModelSerializer):
 # --------- EVENT DRAFT ---------
 
 class EventDraftSerializer(_DraftBaseSerializer):
-    speaker = UserShortSerializer(read_only=True)
 
     class Meta:
         model = EventDraft
@@ -51,7 +50,7 @@ class EventDraftSerializer(_DraftBaseSerializer):
             'date', 'start_time', 'end_time', 'duration_minutes',
             'location', 'is_important', 'is_private',
             'sphere', 'event_type',
-            'speaker', 'assigned_to', 'target_direction', 'target_direction_name',
+            'assigned_to', 'target_direction', 'target_direction_name',
             'suggested_participants', 'unresolved_participant_names',
             'notify_minutes_before',
             'source', 'raw_transcript', 'voice_file_url',
@@ -64,7 +63,7 @@ class EventDraftSerializer(_DraftBaseSerializer):
             'created_by', 'created_at', 'updated_at',
             'published_at', 'published_event', 'rejected_reason',
             'suggested_participants', 'voice_file_url', 'target_direction_name',
-            'speaker', 'assigned_to',
+            'assigned_to',
         )
 
 
@@ -80,15 +79,13 @@ class EventDraftUpdateSerializer(serializers.ModelSerializer):
             'date', 'start_time', 'end_time', 'duration_minutes',
             'location', 'is_important', 'is_private',
             'sphere', 'event_type',
-            'speaker', 'assigned_to', 'suggested_participants',
+            'assigned_to', 'suggested_participants',
             'notify_minutes_before',
         )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         users_qs = _enabled_users_qs()
-        if 'speaker' in self.fields:
-            self.fields['speaker'].queryset = users_qs
         if 'assigned_to' in self.fields:
             self.fields['assigned_to'].queryset = users_qs
         if 'suggested_participants' in self.fields:

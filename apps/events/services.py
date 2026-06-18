@@ -65,16 +65,6 @@ class EventService:
             raise ValidationError("Hozirgi vaqtdan oldin uchun topshiriq qo'shib bo'lmaydi")
 
     @staticmethod
-    def _resolve_speaker(speaker_id):
-        """Ma'ruzachi (ixtiyoriy). Berilmasa None qaytaradi."""
-        if not speaker_id:
-            return None
-        try:
-            return User.objects.get(pk=speaker_id)
-        except User.DoesNotExist as exc:
-            raise ValidationError({'speaker_id': "Ma'ruzachi topilmadi"}) from exc
-
-    @staticmethod
     def _resolve_participants(participant_ids):
         if not participant_ids:
             return []
@@ -133,8 +123,6 @@ class EventService:
     def create(cls, *, validated_data, files, user: User) -> Event:
         cls._validate_in_future(validated_data['date'], validated_data['end_time'])
 
-        # Ma'ruzachi ixtiyoriy — berilmasa yaratuvchi
-        speaker = cls._resolve_speaker(validated_data.get('speaker_id')) or user
         # Qatnashchilar: to'g'ridan-to'g'ri odamlar (boshliq tanlasa) + bo'limlar boshliqlari
         people = cls._resolve_participants(validated_data.get('participant_ids'))
         directions, dir_heads = cls._resolve_directions_and_heads(
@@ -158,7 +146,6 @@ class EventService:
             serial_number=validated_data.get('serial_number') or None,
             notify_time=validated_data.get('notify_time_list') or [],
             direction=direction,
-            speaker=speaker,
             on_behalf_of=cls._resolve_on_behalf_of(user),
         )
 
@@ -196,7 +183,6 @@ class EventService:
 
         cls._validate_in_future(validated_data['date'], validated_data['end_time'])
 
-        speaker = cls._resolve_speaker(validated_data.get('speaker_id')) or event.speaker or user
         people = cls._resolve_participants(validated_data.get('participant_ids'))
         directions, dir_heads = cls._resolve_directions_and_heads(
             validated_data.get('participant_direction_ids'),
@@ -214,7 +200,6 @@ class EventService:
             event.serial_number = validated_data['serial_number'] or None
         if 'notify_time_list' in validated_data:
             event.notify_time = validated_data['notify_time_list'] or []
-        event.speaker = speaker
         event.direction = direction
         event.save()
 

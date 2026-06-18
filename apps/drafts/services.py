@@ -65,7 +65,6 @@ def create_event_draft_from_intent(
 
         assigned_to=assigned_to,
         target_direction=target_direction,
-        speaker=assigned_to,  # default — keyin tahrirlanishi mumkin
 
         raw_transcript=raw_transcript,
         parsed_json=intent,
@@ -149,9 +148,9 @@ def publish_event_draft(draft: EventDraft) -> Event:
 
     _validate_event_publish_requirements(draft)
 
-    direction = draft.target_direction or (draft.speaker.direction if draft.speaker else None)
+    direction = draft.target_direction or (draft.created_by.direction if draft.created_by else None)
     if direction is None:
-        raise ValidationError('Yo\'nalish (Direction) aniqlanmadi — speaker yoki target_direction kerak')
+        raise ValidationError('Yo\'nalish (Direction) aniqlanmadi — bo\'lim (target_direction) tanlang')
 
     event = Event.objects.create(
         title=draft.title,
@@ -165,7 +164,6 @@ def publish_event_draft(draft: EventDraft) -> Event:
         is_important=draft.is_important,
         is_private=draft.is_private,
         direction=direction,
-        speaker=draft.speaker,
         notify_time=draft.notify_minutes_before,
         # Ovozni yuborgan (vazir/o'rinbosar) nomidan — yordamchi joylasa ham.
         # resolve_principal: yaratuvchi yordamchi bo'lsa ham uning rahbariga keltiriladi.
@@ -237,8 +235,6 @@ def _validate_event_publish_requirements(draft: EventDraft) -> None:
         missing.append('soha (sphere)')
     if not draft.event_type:
         missing.append('tadbir turi (event_type)')
-    if not draft.speaker:
-        missing.append('ma\'ruzachi (speaker)')
     if missing:
         raise ValidationError(
             'Tadbir qoralamasini joylash uchun quyidagilar to\'ldirilishi kerak: '

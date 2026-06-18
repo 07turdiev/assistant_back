@@ -51,7 +51,7 @@ def _parse_month(month_str: str) -> tuple:
 
 
 class EventViewSet(viewsets.ModelViewSet):
-    queryset = Event.objects.select_related('speaker', 'direction', 'created_by').prefetch_related(
+    queryset = Event.objects.select_related('on_behalf_of', 'direction', 'created_by').prefetch_related(
         'participants', 'visitors', 'files', 'protocols',
     )
     parser_classes = (JSONParser, MultiPartParser, FormParser)
@@ -119,7 +119,9 @@ class EventViewSet(viewsets.ModelViewSet):
             user_ids = calendar_user_ids(user)
 
         return self.queryset.filter(
-            Q(speaker_id__in=user_ids) | Q(participants__id__in=user_ids)
+            Q(created_by_id__in=user_ids)
+            | Q(on_behalf_of_id__in=user_ids)
+            | Q(participants__id__in=user_ids)
         ).distinct()
 
     # --------- INFO ---------

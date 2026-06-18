@@ -28,7 +28,6 @@ class VisitorSerializer(serializers.ModelSerializer):
 
 class EventListSerializer(serializers.ModelSerializer):
     """Kalendar/list uchun yengilroq variant."""
-    speaker = UserShortSerializer(read_only=True)
     on_behalf_of = UserShortSerializer(read_only=True)
 
     class Meta:
@@ -36,7 +35,7 @@ class EventListSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'title', 'date', 'start_time', 'end_time', 'address',
             'sphere', 'type', 'is_important', 'is_private',
-            'serial_number', 'speaker', 'on_behalf_of', 'created_by',
+            'serial_number', 'on_behalf_of', 'created_by',
         )
 
 
@@ -51,7 +50,6 @@ class EventDirectionSerializer(serializers.Serializer):
 
 class EventDetailSerializer(serializers.ModelSerializer):
     """To'liq ma'lumot — `GET /api/events/{id}/` va `/info/{id}` uchun."""
-    speaker = UserShortSerializer(read_only=True)
     on_behalf_of = UserShortSerializer(read_only=True)
     participants = UserShortSerializer(many=True, read_only=True)
     participant_directions = EventDirectionSerializer(many=True, read_only=True)
@@ -65,7 +63,7 @@ class EventDetailSerializer(serializers.ModelSerializer):
             'id', 'title', 'description', 'date', 'start_time', 'end_time',
             'address', 'serial_number', 'sphere', 'type',
             'is_important', 'is_private', 'conclusion',
-            'direction', 'speaker', 'on_behalf_of', 'participants', 'participant_directions', 'visitors',
+            'direction', 'on_behalf_of', 'participants', 'participant_directions', 'visitors',
             'notify_time', 'files', 'protocols',
             'created_at', 'updated_at', 'created_by',
         )
@@ -91,8 +89,6 @@ class EventInputSerializer(serializers.Serializer):
         child=serializers.IntegerField(min_value=1),
         required=False, default=list,
     )
-    # Ma'ruzachi ixtiyoriy (berilmasa — yaratuvchi)
-    speaker_id = serializers.UUIDField(required=False, allow_null=True)
     # Qatnashchilar ikki manbadan: to'g'ridan-to'g'ri odamlar (boshliq tanlasa)
     # va bo'limlar (yuqori rollar tanlaydi → boshliqlar qatnashchi bo'ladi)
     participant_ids = serializers.ListField(

@@ -21,10 +21,10 @@ def _user_can_access(user, att: Attachment) -> bool:
     # Event fayli (file_event yoki protocol_event)
     event = att.file_event or att.protocol_event
     if event is not None:
-        # Yopiq tadbir bo'lsa — faqat speaker/participant/created_by ko'ra oladi
+        # Yopiq tadbir bo'lsa — faqat tashkilotchi/yaratuvchi/qatnashchi ko'ra oladi
         if event.is_private:
             return (
-                event.speaker_id == user.id
+                event.on_behalf_of_id == user.id
                 or event.created_by_id == user.id
                 or event.participant_links.filter(user_id=user.id).exists()
             )

@@ -162,7 +162,7 @@ def _execute_event_reminder(task: ScheduledTask) -> None:
     if not task.event_id:
         return
     try:
-        event = Event.objects.select_related('speaker', 'direction').prefetch_related(
+        event = Event.objects.select_related('on_behalf_of', 'direction').prefetch_related(
             'participants', 'participants__chief',
         ).get(pk=task.event_id)
     except Event.DoesNotExist:

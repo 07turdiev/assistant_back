@@ -56,16 +56,20 @@ EVENT_NOTIFY_TEXTS = {
 
 
 def _format_event_body(event) -> str:
-    """SMS/Email/Web Push uchun tadbir tafsiloti (production format)."""
-    speaker = event.speaker
-    speaker_full = ' '.join(filter(None, [speaker.last_name, speaker.first_name, speaker.father_name]))
+    """SMS/Email/Web Push uchun tadbir tafsiloti."""
+    organizer = event.on_behalf_of
+    organizer_full = ' '.join(
+        filter(None, [organizer.last_name, organizer.first_name, organizer.father_name]),
+    ) if organizer else ''
     when = f"{event.date.strftime('%d-%m-%Y')} {event.start_time.strftime('%H:%M')}"
-    return (
-        f"📂 Mavzu: {event.title}\n"
-        f"📖 Mazmuni: {event.description or '—'}\n"
-        f"👤 Ijrochi: {speaker_full}\n"
-        f"⏰ Ijro muddati: {when}"
-    )
+    lines = [
+        f"📂 Mavzu: {event.title}",
+        f"📖 Mazmuni: {event.description or '—'}",
+    ]
+    if organizer_full:
+        lines.append(f"👤 Tashkilotchi: {organizer_full}")
+    lines.append(f"⏰ Vaqt: {when}")
+    return '\n'.join(lines)
 
 
 # --- Ichki dispatch funksiyalari ---
@@ -119,9 +123,6 @@ class NotificationService:
         # 1. Qatnashchilarni yig'ish (recursive subordinate bilan)
         participants = list(event.participants.all())
         recipients = _collect_recipients(participants)
-        # Speaker o'zi ham xabardor bo'lsin
-        if event.speaker_id and not any(r.id == event.speaker_id for r in recipients):
-            recipients.append(event.speaker)
 
         # Yo'naltirishda — faqat tanlangan foydalanuvchilarga
         if only_user_ids is not None:
