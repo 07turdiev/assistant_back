@@ -96,6 +96,7 @@ def _create_draft_pipeline(
             created_by=sender,
             assigned_to=resolved.assigned_to,
             target_direction=resolved.target_direction,
+            participant_directions=resolved.participant_directions,
             suggested_participants=resolved.suggested_participants,
             unresolved_names=resolved.unresolved_names,
             raw_transcript=raw_text,

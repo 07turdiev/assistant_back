@@ -30,6 +30,7 @@ def create_event_draft_from_intent(
     created_by,
     assigned_to=None,
     target_direction=None,
+    participant_directions=None,
     suggested_participants=None,
     unresolved_names: list[str] | None = None,
     raw_transcript: str = '',
@@ -79,9 +80,15 @@ def create_event_draft_from_intent(
     )
     if suggested_participants:
         draft.suggested_participants.set(suggested_participants)
-    # AI aniqlagan bo'limni tanlangan bo'lim/boshqarmalar ro'yxatiga qo'shamiz
-    if target_direction is not None:
-        draft.target_directions.set([target_direction])
+    # AI aniqlagan asosiy bo'lim + qatnashuvchi bo'lim/boshqarmalar — barchasi tanlangan ro'yxatga
+    dirs: list = []
+    seen_ids: set = set()
+    for d in [target_direction, *(participant_directions or [])]:
+        if d is not None and d.id not in seen_ids:
+            dirs.append(d)
+            seen_ids.add(d.id)
+    if dirs:
+        draft.target_directions.set(dirs)
     return draft
 
 

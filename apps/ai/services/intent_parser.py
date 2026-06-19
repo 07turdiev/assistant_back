@@ -25,7 +25,7 @@ REQUIRED_FIELDS = {
     'type', 'title', 'description',
     'date', 'start_time', 'end_time', 'duration_minutes',
     'location', 'event_type', 'sphere', 'is_important', 'is_private',
-    'target_department', 'mentioned_participants',
+    'target_department', 'participant_departments', 'mentioned_participants',
     'notify_minutes_before',
 }
 
@@ -98,6 +98,7 @@ def _build_fallback(text: str, intent_type_hint: str | None) -> dict[str, Any]:
         'is_important': False,
         'is_private': False,
         'target_department': None,
+        'participant_departments': [],
         'mentioned_participants': [],
         'notify_minutes_before': _default_notifies(intent_type),
     }
@@ -127,6 +128,7 @@ def _normalize(raw: dict[str, Any]) -> dict[str, Any]:
         'is_private': bool(raw.get('is_private', False)),
 
         'target_department': raw.get('target_department'),
+        'participant_departments': list(raw.get('participant_departments') or []),
         'mentioned_participants': list(raw.get('mentioned_participants') or []),
 
         'notify_minutes_before': list(raw.get('notify_minutes_before') or _default_notifies(intent_type)),

@@ -30,6 +30,8 @@ class ResolveResult:
     assigned_to: 'User | None' = None
     target_direction: 'Direction | None' = None
     parent_direction: 'Direction | None' = None
+    # Qatnashuvchi bo'lim/boshqarmalar (har birining boshlig'i tadbirga qo'shiladi)
+    participant_directions: list = field(default_factory=list)
     suggested_participants: list = field(default_factory=list)
     unresolved_names: list[str] = field(default_factory=list)
     # Bot foydalanuvchidan tanlashni so'rashi kerak bo'lgan holatlar
@@ -89,6 +91,22 @@ def resolve_intent(
             result.target_direction = guessed
             result.warnings.append(f"Bo'lim mavzudan aniqlandi: {guessed.name_uz}")
 
+    # 1.6 Qatnashuvchi bo'lim/yo'nalishlar ("teatr, konsert yo'nalishlari qatnashsin") —
+    #     har birini Direction'ga moslab, qatnashchi bo'limlarga qo'shamiz.
+    seen_dir_ids = {result.target_direction.id} if result.target_direction else set()
+    for dept_name in (intent.get('participant_departments') or []):
+        dept_clean = (dept_name or '').strip()
+        if not dept_clean:
+            continue
+        d = _resolve_direction(dept_clean)
+        if d is None:
+            d = _match_direction_from_topic(dept_clean)
+        if d and d.id not in seen_dir_ids:
+            result.participant_directions.append(d)
+            seen_dir_ids.add(d.id)
+        elif d is None:
+            result.warnings.append(f'"{dept_clean}" — qatnashuvchi bo\'lim DB\'da topilmadi')
+
     # 2. Aytilgan ismlarni User'ga moslash (suggested_participants uchun)
     mentioned_names = intent.get('mentioned_participants') or []
     matched, unmatched = _resolve_user_names(mentioned_names)
@@ -144,14 +162,21 @@ def _resolve_direction(name: str) -> 'Direction | None':
     if direction:
         return direction
 
-    # 2. Substring (foydalanuvchi to'liq aytmagan bo'lishi mumkin)
+    # 2. Substring (qisqa kalit so'z uchun: "teatr" → "Teatr va sirk ... bo'limi")
     direction = Direction.objects.filter(
         Q(name_uz__icontains=name_clean) | Q(name_ru__icontains=name_clean)
     ).first()
     if direction:
         return direction
 
-    # 3. Fuzzy — barcha bo'limlar bilan foizli o'xshashlik (AI nomi to'liq mos kelmasligi mumkin)
+    # 3. So'z-balansli moslik — ko'p so'zli, agglutinativ (qo'shimchali) nomlar uchun ENG ishonchli.
+    #    Apostrof/affiks farqlariga chidamli: "raqamlashtirish va sun'iy intellekt" →
+    #    "Raqamlashtirish va sun'iy intellektni rivojlantirish boshqarmasi".
+    word_match = _best_direction_by_words(name_clean)
+    if word_match:
+        return word_match
+
+    # 4. Char-fuzzy — oxirgi chora (imlo/STT xatosi uchun)
     from apps.core.fuzzy import best_match
     all_dirs = list(Direction.objects.all())
     return (
@@ -169,6 +194,52 @@ _DIR_STOPWORDS = {
     'sohasi', 'boyicha', "bo'yicha", 'va', 'hamda', 'tashkil', 'qilish', 'nazorat',
     'tahlil', 'xizmati', 'xizmat', 'guruhi', 'guruh', 'qoshma',
 }
+
+
+def _word_hits(a_words: list[str], b_words: list[str]) -> int:
+    """`a_words` dan nechtasi `b_words` ichida bor (aniq yoki uzun so'z substringi)."""
+    hits = 0
+    for w in a_words:
+        for t in b_words:
+            if w == t or ((len(w) >= 5 or len(t) >= 5) and (w in t or t in w)):
+                hits += 1
+                break
+    return hits
+
+
+def _dir_words(text: str) -> list[str]:
+    """Matnni ma'noli so'zlarga ajratadi (stopword va qisqa so'zlarsiz)."""
+    from apps.core.fuzzy import _norm
+    return [w for w in _norm(text).split() if len(w) > 2 and w not in _DIR_STOPWORDS]
+
+
+def _best_direction_by_words(query: str) -> 'Direction | None':
+    """Bo'lim NOMI/iborasini so'z-balansli moslik bilan Direction'ga moslaydi.
+
+    Ham query qamrovi (query so'zlari nomda bor), ham nom qamrovi (nom so'zlari queryda bor)
+    hisoblanadi va F1 (garmonik o'rta) olinadi — shunda qisqa nomlar ("Sun'iy intellekt bo'limi")
+    to'liqroq nomdan ("...sun'iy intellektni rivojlantirish boshqarmasi") asossiz ustun kelmaydi.
+    """
+    from apps.directions.models import Direction
+
+    q_words = _dir_words(query)
+    if not q_words:
+        return None
+    best = None
+    best_score = 0.0
+    for d in Direction.objects.all():
+        n_words = _dir_words(d.name_uz)
+        if not n_words:
+            continue
+        q_cov = _word_hits(q_words, n_words) / len(q_words)
+        n_cov = _word_hits(n_words, q_words) / len(n_words)
+        if q_cov + n_cov == 0:
+            continue
+        f1 = 2 * q_cov * n_cov / (q_cov + n_cov)
+        if f1 > best_score:
+            best_score = f1
+            best = d
+    return best if best_score >= 0.5 else None
 
 
 def _match_direction_from_topic(topic: str) -> 'Direction | None':
