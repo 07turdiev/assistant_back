@@ -150,6 +150,15 @@ class EventDraft(_DraftBase):
         help_text='AI taklif qilgan qatnashchilar (DB\'dan topilgan)',
     )
 
+    # Qatnashchi bo'lim/boshqarmalar — joylanganda HAR BIRINING boshlig'i tadbirga qatnashadi.
+    # (target_direction — AI aniqlagan bittasi; bu — tahrirda tanlangan ko'p bo'lim.)
+    target_directions = models.ManyToManyField(
+        'directions.Direction',
+        blank=True,
+        related_name='+',
+        help_text='Tanlangan bo\'lim/boshqarmalar — har birining boshlig\'i qatnashchi bo\'ladi',
+    )
+
     # Joylangach — yaratilgan Event'ga link
     published_event = models.OneToOneField(
         'events.Event',

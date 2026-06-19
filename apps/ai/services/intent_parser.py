@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 REQUIRED_FIELDS = {
     'type', 'title', 'description',
     'date', 'start_time', 'end_time', 'duration_minutes',
-    'location', 'is_important', 'is_private',
+    'location', 'event_type', 'sphere', 'is_important', 'is_private',
     'target_department', 'mentioned_participants',
     'notify_minutes_before',
 }
@@ -93,6 +93,8 @@ def _build_fallback(text: str, intent_type_hint: str | None) -> dict[str, Any]:
         'end_time': None,
         'duration_minutes': None,
         'location': None,
+        'event_type': None,
+        'sphere': None,
         'is_important': False,
         'is_private': False,
         'target_department': None,
@@ -119,6 +121,8 @@ def _normalize(raw: dict[str, Any]) -> dict[str, Any]:
         'end_time': raw.get('end_time'),
         'duration_minutes': raw.get('duration_minutes'),
         'location': raw.get('location'),
+        'event_type': raw.get('event_type'),
+        'sphere': raw.get('sphere'),
         'is_important': bool(raw.get('is_important', False)),
         'is_private': bool(raw.get('is_private', False)),
 

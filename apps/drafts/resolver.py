@@ -75,6 +75,20 @@ def resolve_intent(
         else:
             result.warnings.append(f'"{target_dept_name}" — bunday bo\'lim DB\'da topilmadi')
 
+    # 1.5 Bo'lim aniq aytilmagan/topilmagan bo'lsa — MAVZU (sarlavha + tavsif) nomidan
+    #     bo'lim/boshqarmalarni DB bilan solishtirib aniqlashga harakat qilamiz.
+    #     ("raqamlashtirish va sun'iy intellekt yo'nalishi" → tegishli boshqarma)
+    if result.target_direction is None:
+        topic = ' '.join(filter(None, [
+            intent.get('title') or '',
+            intent.get('description') or '',
+            target_dept_name,
+        ]))
+        guessed = _match_direction_from_topic(topic)
+        if guessed:
+            result.target_direction = guessed
+            result.warnings.append(f"Bo'lim mavzudan aniqlandi: {guessed.name_uz}")
+
     # 2. Aytilgan ismlarni User'ga moslash (suggested_participants uchun)
     mentioned_names = intent.get('mentioned_participants') or []
     matched, unmatched = _resolve_user_names(mentioned_names)
@@ -144,6 +158,58 @@ def _resolve_direction(name: str) -> 'Direction | None':
         best_match(name_clean, all_dirs, key=lambda d: d.name_uz, threshold=0.5)
         or best_match(name_clean, all_dirs, key=lambda d: d.name_ru, threshold=0.5)
     )
+
+
+# Bo'lim/boshqarma nomlaridagi umumiy/ahamiyatsiz so'zlar — mavzu solishtirishda e'tiborsiz
+_DIR_STOPWORDS = {
+    'va', 'bilan', 'uchun', 'bolim', "bo'lim", "bo'limi", 'bolimi', 'boshqarma',
+    'boshqarmasi', 'departament', 'departamenti', 'sektor', 'sektori', 'markaz',
+    'markazi', 'bosh', 'general', 'rivojlantirish', 'masalalari', 'masala',
+    'ishlari', 'ish', 'yonalishi', "yo'nalishi", 'yonalish', "yo'nalish", 'soha',
+    'sohasi', 'boyicha', "bo'yicha", 'va', 'hamda', 'tashkil', 'qilish', 'nazorat',
+    'tahlil', 'xizmati', 'xizmat', 'guruhi', 'guruh', 'qoshma',
+}
+
+
+def _match_direction_from_topic(topic: str) -> 'Direction | None':
+    """Bo'lim aniq aytilmaganda — tadbir MAVZUSIDAN (sarlavha/tavsif) bo'limni topadi.
+
+    Har bir Direction nomidagi MA'NOLI so'zlar (stopwordsdan tashqari) mavzuda
+    qanchalik uchrashini hisoblaydi. Eng ko'p mos kelgan (>=50%) bo'limni qaytaradi.
+    Substring mosligi ham hisoblanadi ("intellekt" -> "intellektni").
+    """
+    from apps.core.fuzzy import _norm
+    from apps.directions.models import Direction
+
+    if not topic or not topic.strip():
+        return None
+    topic_words = {w for w in _norm(topic).split() if len(w) > 2}
+    if not topic_words:
+        return None
+
+    best = None
+    best_score = 0.0
+    for d in Direction.objects.all():
+        name_words = [
+            w for w in _norm(d.name_uz).split()
+            if len(w) > 2 and w not in _DIR_STOPWORDS
+        ]
+        if not name_words:
+            continue
+        hits = 0
+        for w in name_words:
+            for tw in topic_words:
+                # Qisqa so'zlar — faqat aniq moslik; uzun so'zlar — substring ham (intellekt→intellektni)
+                if w == tw or (len(w) >= 5 and (w in tw or tw in w)):
+                    hits += 1
+                    break
+        score = hits / len(name_words)
+        # Ko'p so'zli bo'lim — kamida 2 ta moslik; bir so'zli — 1 ta yetarli
+        min_hits = 2 if len(name_words) >= 2 else 1
+        if score > best_score and hits >= min_hits:
+            best_score = score
+            best = d
+    return best if best_score >= 0.5 else None
 
 
 def _find_head_of_direction(direction: 'Direction') -> 'User | None':

@@ -41,7 +41,16 @@ class _DraftBaseSerializer(serializers.ModelSerializer):
 
 # --------- EVENT DRAFT ---------
 
+class _DraftDirectionSerializer(serializers.Serializer):
+    """Qoralamada tanlangan bo'lim/boshqarma — yengil ko'rinish."""
+    id = serializers.UUIDField(read_only=True)
+    name_uz = serializers.CharField(read_only=True)
+    name_ru = serializers.CharField(read_only=True)
+    kind = serializers.CharField(read_only=True)
+
+
 class EventDraftSerializer(_DraftBaseSerializer):
+    target_directions = _DraftDirectionSerializer(many=True, read_only=True)
 
     class Meta:
         model = EventDraft
@@ -50,7 +59,7 @@ class EventDraftSerializer(_DraftBaseSerializer):
             'date', 'start_time', 'end_time', 'duration_minutes',
             'location', 'is_important', 'is_private',
             'sphere', 'event_type',
-            'assigned_to', 'target_direction', 'target_direction_name',
+            'assigned_to', 'target_direction', 'target_direction_name', 'target_directions',
             'suggested_participants', 'unresolved_participant_names',
             'notify_minutes_before',
             'source', 'raw_transcript', 'voice_file_url',
@@ -63,7 +72,7 @@ class EventDraftSerializer(_DraftBaseSerializer):
             'created_by', 'created_at', 'updated_at',
             'published_at', 'published_event', 'rejected_reason',
             'suggested_participants', 'voice_file_url', 'target_direction_name',
-            'assigned_to',
+            'target_directions', 'assigned_to',
         )
 
 
@@ -79,7 +88,7 @@ class EventDraftUpdateSerializer(serializers.ModelSerializer):
             'date', 'start_time', 'end_time', 'duration_minutes',
             'location', 'is_important', 'is_private',
             'sphere', 'event_type',
-            'assigned_to', 'suggested_participants',
+            'assigned_to', 'suggested_participants', 'target_directions',
             'notify_minutes_before',
         )
 

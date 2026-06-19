@@ -57,6 +57,8 @@ def create_event_draft_from_intent(
         end_time=_parse_time(intent.get('end_time')),
         duration_minutes=intent.get('duration_minutes'),
         location=intent.get('location') or '',
+        event_type=_map_event_type(intent.get('event_type')),
+        sphere=_map_sphere(intent.get('sphere')),
         is_important=bool(intent.get('is_important')),
         is_private=bool(intent.get('is_private')),
         notify_minutes_before=intent.get('notify_minutes_before') or [60, 1440],
@@ -77,6 +79,9 @@ def create_event_draft_from_intent(
     )
     if suggested_participants:
         draft.suggested_participants.set(suggested_participants)
+    # AI aniqlagan bo'limni tanlangan bo'lim/boshqarmalar ro'yxatiga qo'shamiz
+    if target_direction is not None:
+        draft.target_directions.set([target_direction])
     return draft
 
 
@@ -148,9 +153,15 @@ def publish_event_draft(draft: EventDraft) -> Event:
 
     _validate_event_publish_requirements(draft)
 
-    direction = draft.target_direction or (draft.created_by.direction if draft.created_by else None)
+    # Tanlangan bo'lim/boshqarmalar (tahrirda ko'p tanlanishi mumkin)
+    selected_dirs = list(draft.target_directions.all())
+    direction = (
+        (selected_dirs[0] if selected_dirs else None)
+        or draft.target_direction
+        or (draft.created_by.direction if draft.created_by else None)
+    )
     if direction is None:
-        raise ValidationError('Yo\'nalish (Direction) aniqlanmadi — bo\'lim (target_direction) tanlang')
+        raise ValidationError('Yo\'nalish aniqlanmadi — kamida bitta bo\'lim yoki boshqarma tanlang')
 
     # Aytilgan manzilni vazirlik zaliga moslashtirish: nom mos kelsa — zal band qilinadi
     # (to'qnashuv qattiq bloklanadi), aks holda manzil oddiy matn (tashqi hudud) bo'lib qoladi.
@@ -192,13 +203,15 @@ def publish_event_draft(draft: EventDraft) -> Event:
     # Zal tanlangan bo'lsa — bandlikni yozamiz (tadbirga bog'langan bron)
     sync_event_booking(event)
 
-    # Qatnashchilar — aytilgan odamlar + yo'naltirilgan bo'lim boshlig'i
+    # Qatnashuvchi bo'lim/boshqarmalar — HAR BIRINING boshlig'i tadbirga qatnashadi
     participant_users = set(draft.suggested_participants.all())
-    if draft.target_direction:
-        event.participant_directions.set([draft.target_direction])
-        head = draft.target_direction.head
-        if head and head.enabled:
-            participant_users.add(head)
+    dirs_for_event = selected_dirs or ([draft.target_direction] if draft.target_direction else [])
+    if dirs_for_event:
+        event.participant_directions.set(dirs_for_event)
+        for d in dirs_for_event:
+            head = d.head
+            if head and head.enabled:
+                participant_users.add(head)
     for user in participant_users:
         EventParticipant.objects.create(event=event, user=user)
 
@@ -262,6 +275,36 @@ def _validate_event_publish_requirements(draft: EventDraft) -> None:
             'Tadbir qoralamasini joylash uchun quyidagilar to\'ldirilishi kerak: '
             + ', '.join(missing)
         )
+
+
+def _map_event_type(value) -> str:
+    """AI bergan tadbir turini EventType qiymatiga moslaydi (aniq, label yoki fuzzy)."""
+    if not value:
+        return ''
+    from apps.core.fuzzy import best_match
+    from apps.info.enums import EventType
+    val = str(value).strip()
+    pairs = list(EventType.choices)  # (value, label)
+    if val in {v for v, _ in pairs}:
+        return val
+    m = (best_match(val, pairs, key=lambda p: p[1], threshold=0.5)
+         or best_match(val, pairs, key=lambda p: p[0], threshold=0.5))
+    return m[0] if m else ''
+
+
+def _map_sphere(value) -> str:
+    """AI bergan soha labelini Sphere qiymatiga (key) moslaydi (aniq label yoki fuzzy)."""
+    if not value:
+        return ''
+    from apps.core.fuzzy import best_match
+    from apps.info.enums import Sphere
+    val = str(value).strip()
+    pairs = list(Sphere.choices)  # (value, label)
+    for v, label in pairs:
+        if label.lower() == val.lower():
+            return v
+    m = best_match(val, pairs, key=lambda p: p[1], threshold=0.5)
+    return m[0] if m else ''
 
 
 def _parse_date(value):
