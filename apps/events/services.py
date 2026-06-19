@@ -12,7 +12,8 @@ from apps.directions.models import Direction
 from apps.info.enums import NotificationType
 from apps.users.models import User
 
-from .models import Event, EventParticipant, Visitor
+from .booking import assert_no_conflict, sync_event_booking
+from .models import Event, EventParticipant, HallBooking, Visitor
 
 logger = logging.getLogger(__name__)
 
@@ -118,6 +119,30 @@ class EventService:
             return fallback_directions[0]
         raise ValidationError("Yo'nalishni aniqlab bo'lmadi (bo'lim yoki xodim tanlang)")
 
+    @staticmethod
+    def _resolve_location(validated_data):
+        """Manzil: hona tanlansa (hall) — vazirlik binosi; aks holda region/district (tashqi).
+
+        Returns (hall, region, district). Hona tanlansa region/district e'tiborga olinmaydi.
+        """
+        from .models import Hall
+        hall = region = district = None
+        hall_id = validated_data.get('hall_id')
+        if hall_id:
+            try:
+                hall = Hall.objects.get(pk=hall_id)
+            except Hall.DoesNotExist as exc:
+                raise ValidationError({'hall_id': 'Zal topilmadi'}) from exc
+            return hall, None, None
+        from apps.organisations.models import District, Region
+        region_id = validated_data.get('region_id')
+        district_id = validated_data.get('district_id')
+        if region_id:
+            region = Region.objects.filter(pk=region_id).first()
+        if district_id:
+            district = District.objects.filter(pk=district_id).first()
+        return None, region, district
+
     @classmethod
     @transaction.atomic
     def create(cls, *, validated_data, files, user: User) -> Event:
@@ -130,6 +155,14 @@ class EventService:
         )
         participants = cls._merge_participants(people, dir_heads)
         direction = cls._resolve_direction(user, validated_data.get('direction_id'), directions)
+
+        # Manzil + zal bandligini tekshirish (zal bo'lsa to'qnashuv qattiq bloklanadi)
+        hall, region, district = cls._resolve_location(validated_data)
+        if hall is not None:
+            assert_no_conflict(
+                hall_id=hall.id, date=validated_data['date'],
+                start_time=validated_data['start_time'], end_time=validated_data['end_time'],
+            )
 
         event = Event.objects.create(
             title=validated_data['title'],
@@ -147,7 +180,13 @@ class EventService:
             notify_time=validated_data.get('notify_time_list') or [],
             direction=direction,
             on_behalf_of=cls._resolve_on_behalf_of(user),
+            hall=hall,
+            region=region,
+            district=district,
         )
+
+        # Zal bandligini yozish (tadbirga bog'langan bron)
+        sync_event_booking(event)
 
         # Qatnashchilar (bo'lim boshliqlari + tanlangan odamlar)
         EventParticipant.objects.bulk_create([
@@ -190,6 +229,19 @@ class EventService:
         participants = cls._merge_participants(people, dir_heads)
         direction = cls._resolve_direction(user, validated_data.get('direction_id'), directions)
 
+        # Manzil + zal bandligi (o'z bronini istisno qilib tekshiramiz)
+        hall, region, district = cls._resolve_location(validated_data)
+        if hall is not None:
+            own_booking_id = (
+                HallBooking.objects.filter(event_id=event.id)
+                .values_list('pk', flat=True).first()
+            )
+            assert_no_conflict(
+                hall_id=hall.id, date=validated_data['date'],
+                start_time=validated_data['start_time'], end_time=validated_data['end_time'],
+                exclude_booking_id=own_booking_id,
+            )
+
         # Asosiy maydonlar
         for field in ('title', 'description', 'date', 'start_time', 'end_time',
                       'address', 'sphere', 'type', 'is_private', 'is_important',
@@ -201,7 +253,13 @@ class EventService:
         if 'notify_time_list' in validated_data:
             event.notify_time = validated_data['notify_time_list'] or []
         event.direction = direction
+        event.hall = hall
+        event.region = region
+        event.district = district
         event.save()
+
+        # Zal bronini yangilash/yaratish/o'chirish
+        sync_event_booking(event)
 
         # Tanlangan bo'limlarni yangilash (ko'rsatish uchun)
         event.participant_directions.set(directions)

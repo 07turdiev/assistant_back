@@ -66,6 +66,18 @@ class Event(AuditMixin):
         null=True, blank=True,
         related_name='events_on_behalf',
     )
+    # Manzil — ikki rejim:
+    #  (a) Vazirlik binosi: `hall` tanlanadi (hona band qilinadi, to'qnashuv tekshiriladi)
+    #  (b) Tashqi hudud: `region` + `district` + `address` (qo'shimcha maydon)
+    hall = models.ForeignKey(
+        'events.Hall', on_delete=models.SET_NULL, null=True, blank=True, related_name='events',
+    )
+    region = models.ForeignKey(
+        'organisations.Region', on_delete=models.SET_NULL, null=True, blank=True, related_name='+',
+    )
+    district = models.ForeignKey(
+        'organisations.District', on_delete=models.SET_NULL, null=True, blank=True, related_name='+',
+    )
     # `notify_time` (List<Integer>) — SQLite dev uchun JSONField,
     # PostgreSQL ga ko'chganda ArrayField'ga converted bo'lsa ham bo'ladi.
     notify_time = models.JSONField(default=list, blank=True)
@@ -123,3 +135,39 @@ class Hall(models.Model):
 
     def __str__(self) -> str:
         return f'{self.floor}-etaj: {self.name}'
+
+
+class HallBooking(AuditMixin):
+    """Yig'ilish honasi bandligi (yagona yozuv).
+
+    Ikki manba:
+      - Tadbir vazirlik honasida bo'lsa → `event` bog'langan bron avtomatik yaratiladi.
+      - Bo'lim/boshqarma alohida band qilsa → `event` bo'sh, faqat `title` (maqsad).
+    To'qnashuv (bir hona, bir vaqt) qattiq bloklanadi.
+    """
+
+    hall = models.ForeignKey(Hall, on_delete=models.CASCADE, related_name='bookings')
+    date = models.DateField()
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    # Kim nomidan band qilingan (bo'lim/boshqarma)
+    direction = models.ForeignKey(
+        'directions.Direction', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='hall_bookings',
+    )
+    # Tadbirga bog'liq bo'lsa — o'sha tadbir (har tadbirda ko'pi bilan 1 bron)
+    event = models.OneToOneField(
+        Event, on_delete=models.CASCADE,
+        null=True, blank=True, related_name='hall_booking',
+    )
+    # Alohida bron uchun maqsad/nomi (tadbir bo'lsa — tadbir sarlavhasidan olinadi)
+    title = models.CharField(max_length=255, blank=True, default='')
+
+    class Meta:
+        ordering = ['date', 'start_time']
+        indexes = [
+            models.Index(fields=['hall', 'date']),
+        ]
+
+    def __str__(self) -> str:
+        return f'{self.hall} · {self.date} {self.start_time}-{self.end_time}'

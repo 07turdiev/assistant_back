@@ -17,7 +17,7 @@ from rest_framework import serializers
 from apps.attachments.serializers import AttachmentSerializer
 from apps.users.serializers import UserShortSerializer
 
-from .models import Event, EventParticipant, Hall, Visitor
+from .models import Event, EventParticipant, Hall, HallBooking, Visitor
 
 
 class VisitorSerializer(serializers.ModelSerializer):
@@ -26,16 +26,31 @@ class VisitorSerializer(serializers.ModelSerializer):
         fields = ('id', 'full_name', 'organisation_name', 'position')
 
 
+class HallMiniSerializer(serializers.Serializer):
+    """Hona — yengil ko'rinish (tadbir/bron ichida)."""
+    id = serializers.IntegerField(read_only=True)
+    floor = serializers.IntegerField(read_only=True)
+    name = serializers.CharField(read_only=True)
+
+
+class LocationMiniSerializer(serializers.Serializer):
+    """Viloyat/tuman — yengil ko'rinish."""
+    id = serializers.IntegerField(read_only=True)
+    name_uz = serializers.CharField(read_only=True)
+    name_ru = serializers.CharField(read_only=True)
+
+
 class EventListSerializer(serializers.ModelSerializer):
     """Kalendar/list uchun yengilroq variant."""
     on_behalf_of = UserShortSerializer(read_only=True)
+    hall = HallMiniSerializer(read_only=True)
 
     class Meta:
         model = Event
         fields = (
             'id', 'title', 'date', 'start_time', 'end_time', 'address',
             'sphere', 'type', 'is_important', 'is_private',
-            'serial_number', 'on_behalf_of', 'created_by',
+            'serial_number', 'on_behalf_of', 'created_by', 'hall',
         )
 
 
@@ -56,6 +71,9 @@ class EventDetailSerializer(serializers.ModelSerializer):
     visitors = VisitorSerializer(many=True, read_only=True)
     files = AttachmentSerializer(many=True, read_only=True)
     protocols = AttachmentSerializer(many=True, read_only=True)
+    hall = HallMiniSerializer(read_only=True)
+    region = LocationMiniSerializer(read_only=True)
+    district = LocationMiniSerializer(read_only=True)
 
     class Meta:
         model = Event
@@ -64,6 +82,7 @@ class EventDetailSerializer(serializers.ModelSerializer):
             'address', 'serial_number', 'sphere', 'type',
             'is_important', 'is_private', 'conclusion',
             'direction', 'on_behalf_of', 'participants', 'participant_directions', 'visitors',
+            'hall', 'region', 'district',
             'notify_time', 'files', 'protocols',
             'created_at', 'updated_at', 'created_by',
         )
@@ -89,6 +108,10 @@ class EventInputSerializer(serializers.Serializer):
         child=serializers.IntegerField(min_value=1),
         required=False, default=list,
     )
+    # Manzil — ikki rejim: vazirlik honasi (hall_id) yoki tashqi hudud (region/district)
+    hall_id = serializers.IntegerField(required=False, allow_null=True)
+    region_id = serializers.IntegerField(required=False, allow_null=True)
+    district_id = serializers.IntegerField(required=False, allow_null=True)
     # Qatnashchilar ikki manbadan: to'g'ridan-to'g'ri odamlar (boshliq tanlasa)
     # va bo'limlar (yuqori rollar tanlaydi → boshliqlar qatnashchi bo'ladi)
     participant_ids = serializers.ListField(
@@ -148,5 +171,41 @@ class HallSerializer(serializers.ModelSerializer):
     class Meta:
         model = Hall
         fields = ('id', 'floor', 'name')
+
+
+class HallBookingSerializer(serializers.ModelSerializer):
+    """Zal bandligi — kalendar/ro'yxat uchun (kim, qachon, qaysi zal band qilgan)."""
+    hall = HallMiniSerializer(read_only=True)
+    event_title = serializers.SerializerMethodField()
+    direction_name = serializers.SerializerMethodField()
+    booked_by = serializers.SerializerMethodField()
+
+    class Meta:
+        model = HallBooking
+        fields = (
+            'id', 'hall', 'date', 'start_time', 'end_time',
+            'title', 'event', 'event_title', 'direction_name', 'booked_by', 'created_at',
+        )
+        read_only_fields = fields
+
+    def get_event_title(self, obj) -> str:
+        return obj.event.title if obj.event_id and obj.event else ''
+
+    def get_direction_name(self, obj) -> str:
+        return obj.direction.name_uz if obj.direction_id and obj.direction else ''
+
+    def get_booked_by(self, obj) -> str:
+        u = obj.created_by
+        return ' '.join(filter(None, [u.last_name, u.first_name])) if u else ''
+
+
+class HallBookingCreateSerializer(serializers.Serializer):
+    """Alohida zal band qilish (bo'lim nomidan) yoki bandlikni tekshirish."""
+    hall_id = serializers.IntegerField()
+    date = serializers.DateField()
+    start_time = serializers.TimeField()
+    end_time = serializers.TimeField()
+    direction_id = serializers.UUIDField(required=False, allow_null=True)
+    title = serializers.CharField(required=False, allow_blank=True, default='')
 
 

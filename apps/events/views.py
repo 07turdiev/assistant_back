@@ -3,8 +3,9 @@ from datetime import datetime
 
 from django.db.models import Q
 from django.http import Http404
-from rest_framework import status, viewsets
+from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -15,12 +16,15 @@ from apps.core.permissions import HasRole, IsAdminRole
 from apps.users.enums import RoleName
 from apps.users.models import User
 
-from .models import Event, Hall
+from .booking import assert_no_conflict, conflict_message, find_conflict
+from .models import Event, Hall, HallBooking
 from .serializers import (
     EventDetailSerializer,
     EventForwardSerializer,
     EventInputSerializer,
     EventListSerializer,
+    HallBookingCreateSerializer,
+    HallBookingSerializer,
     HallSerializer,
 )
 from .services import EventService, calendar_for_vice, calendar_user_ids
@@ -277,3 +281,91 @@ class HallViewSet(viewsets.ModelViewSet):
         if self.action in ('list', 'retrieve'):
             return [IsAuthenticated()]
         return [IsAuthenticated(), IsAdminRole()]
+
+
+class HallBookingViewSet(
+    mixins.ListModelMixin,
+    mixins.DestroyModelMixin,
+    viewsets.GenericViewSet,
+):
+    """Zal bandligi — ko'rish, alohida band qilish, bekor qilish, tekshirish.
+
+    - GET  /api/hall-bookings/?hall=&start_date=&end_date=  — bandlik ro'yxati
+    - POST /api/hall-bookings/                              — bo'lim nomidan band qilish
+    - POST /api/hall-bookings/check/                        — bandlikni tekshirish (jonli)
+    - DELETE /api/hall-bookings/{id}/                       — bekor qilish (alohida bron)
+    """
+    queryset = HallBooking.objects.select_related('hall', 'direction', 'event', 'created_by').all()
+    serializer_class = HallBookingSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = None
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        hall = self.request.query_params.get('hall')
+        start = self.request.query_params.get('start_date')
+        end = self.request.query_params.get('end_date')
+        if hall:
+            qs = qs.filter(hall_id=hall)
+        if start:
+            qs = qs.filter(date__gte=start)
+        if end:
+            qs = qs.filter(date__lte=end)
+        return qs
+
+    def create(self, request):
+        ser = HallBookingCreateSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        d = ser.validated_data
+        if d['end_time'] <= d['start_time']:
+            raise ValidationError({'end_time': "Tugash vaqti boshlanish vaqtidan keyin bo'lishi kerak"})
+        assert_no_conflict(
+            hall_id=d['hall_id'], date=d['date'],
+            start_time=d['start_time'], end_time=d['end_time'],
+        )
+        booking = HallBooking.objects.create(
+            hall_id=d['hall_id'], date=d['date'],
+            start_time=d['start_time'], end_time=d['end_time'],
+            direction_id=d.get('direction_id'),
+            title=d.get('title') or '',
+        )
+        return Response(HallBookingSerializer(booking).data, status=status.HTTP_201_CREATED)
+
+    def destroy(self, request, pk=None):
+        booking = self.get_object()
+        if booking.event_id:
+            return Response(
+                {'detail': "Bu bron tadbirga bog'langan — tadbir orqali o'zgartiring."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        role = getattr(getattr(request.user, 'role', None), 'name', None)
+        is_admin = request.user.is_superuser or role in ('SUPER_ADMIN', 'ADMIN')
+        if booking.created_by_id != request.user.id and not is_admin:
+            return Response(
+                {'detail': 'Faqat band qilgan shaxs yoki admin bekor qila oladi.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        booking.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=False, methods=['post'], url_path='check')
+    def check(self, request):
+        """Bandlikni tekshirish (jonli UI uchun). `exclude_event_id` — tadbirni tahrirlashda."""
+        ser = HallBookingCreateSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        d = ser.validated_data
+        exclude_booking_id = None
+        exclude_event = request.data.get('exclude_event_id')
+        if exclude_event:
+            exclude_booking_id = (
+                HallBooking.objects.filter(event_id=exclude_event)
+                .values_list('pk', flat=True).first()
+            )
+        conflict = find_conflict(
+            hall_id=d['hall_id'], date=d['date'],
+            start_time=d['start_time'], end_time=d['end_time'],
+            exclude_booking_id=exclude_booking_id,
+        )
+        if conflict:
+            return Response({'available': False, 'message': conflict_message(conflict)})
+        return Response({'available': True})
