@@ -106,3 +106,20 @@ class Visitor(AuditMixin):
 
     def __str__(self) -> str:
         return self.full_name
+
+
+class Hall(models.Model):
+    """Vazirlik binosidagi yig'ilish zali — etaj raqami + zal nomi.
+
+    Misol: floor=-1, name="Katta yig'ilishlar zali"; floor=2, name="Vazir priyomniy".
+    Admin paneldan boshqariladi.
+    """
+
+    floor = models.IntegerField()  # -1, 1, 2, ...
+    name = models.CharField(max_length=255)
+
+    class Meta:
+        ordering = ['floor', 'name']
+
+    def __str__(self) -> str:
+        return f'{self.floor}-etaj: {self.name}'

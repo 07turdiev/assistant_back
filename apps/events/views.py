@@ -11,16 +11,17 @@ from rest_framework.response import Response
 
 from apps.attachments.models import Attachment
 from apps.attachments.services import remove_attachment
-from apps.core.permissions import HasRole
+from apps.core.permissions import HasRole, IsAdminRole
 from apps.users.enums import RoleName
 from apps.users.models import User
 
-from .models import Event
+from .models import Event, Hall
 from .serializers import (
     EventDetailSerializer,
     EventForwardSerializer,
     EventInputSerializer,
     EventListSerializer,
+    HallSerializer,
 )
 from .services import EventService, calendar_for_vice, calendar_user_ids
 
@@ -264,3 +265,15 @@ class EventViewSet(viewsets.ModelViewSet):
                 pass
 
         return data
+
+
+class HallViewSet(viewsets.ModelViewSet):
+    """Yig'ilish zallari — admin paneldan boshqariladi (ko'rish — barcha auth user)."""
+    queryset = Hall.objects.all()
+    serializer_class = HallSerializer
+    pagination_class = None
+
+    def get_permissions(self):
+        if self.action in ('list', 'retrieve'):
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), IsAdminRole()]

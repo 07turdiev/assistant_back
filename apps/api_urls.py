@@ -1,7 +1,7 @@
 """Yagona /api/ URL konfiguratsiyasi."""
 from django.urls import include, path
 
-from apps.events.urls import events_router
+from apps.events.urls import events_router, halls_router
 from apps.notifications.urls import notifications_urlpatterns, webpush_urlpatterns
 from apps.organisations.urls import (
     districts_router,
@@ -17,6 +17,7 @@ urlpatterns = [
     path('regions/', include(regions_router.urls)),
     path('districts/', include(districts_router.urls)),
     path('events/', include(events_router.urls)),
+    path('halls/', include(halls_router.urls)),
     path('reports/', include('apps.reports.urls')),
     path('drafts/', include('apps.drafts.urls')),
     path('chat/', include('apps.chat.urls')),
