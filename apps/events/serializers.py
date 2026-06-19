@@ -74,6 +74,8 @@ class EventDetailSerializer(serializers.ModelSerializer):
     hall = HallMiniSerializer(read_only=True)
     region = LocationMiniSerializer(read_only=True)
     district = LocationMiniSerializer(read_only=True)
+    # Joriy foydalanuvchi tadbirni tahrirlay/o'chira oladimi (muallif, rahbar yoki yordamchi)
+    can_manage = serializers.SerializerMethodField()
 
     class Meta:
         model = Event
@@ -82,10 +84,20 @@ class EventDetailSerializer(serializers.ModelSerializer):
             'address', 'serial_number', 'sphere', 'type',
             'is_important', 'is_private', 'conclusion',
             'direction', 'on_behalf_of', 'participants', 'participant_directions', 'visitors',
-            'hall', 'region', 'district',
+            'hall', 'region', 'district', 'can_manage',
             'notify_time', 'files', 'protocols',
             'created_at', 'updated_at', 'created_by',
         )
+
+    def get_can_manage(self, obj) -> bool:
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        if user is None or not user.is_authenticated:
+            return False
+        if user.is_superuser or obj.created_by_id == user.id:
+            return True
+        from apps.users.delegation import can_act_as
+        return can_act_as(user, obj.on_behalf_of_id) or can_act_as(user, obj.created_by_id)
 
 
 class EventInputSerializer(serializers.Serializer):

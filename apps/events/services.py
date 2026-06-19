@@ -106,6 +106,15 @@ class EventService:
         return resolve_principal(user)
 
     @staticmethod
+    def _can_manage(user: User, event: Event) -> bool:
+        """Tadbirni tahrirlash/o'chirish huquqi: muallif (created_by), rahbar
+        (on_behalf_of), uning yordamchilari yoki superuser."""
+        from apps.users.delegation import can_act_as
+        if user.is_superuser or event.created_by_id == user.id:
+            return True
+        return can_act_as(user, event.on_behalf_of_id) or can_act_as(user, event.created_by_id)
+
+    @staticmethod
     def _resolve_direction(user: User, direction_id, fallback_directions=None):
         if direction_id:
             try:
@@ -217,8 +226,8 @@ class EventService:
     @classmethod
     @transaction.atomic
     def update(cls, event: Event, *, validated_data, files, user: User) -> Event:
-        if event.created_by_id != user.id and not user.is_superuser:
-            raise PermissionDenied("Faqat tadbir yaratuvchisi tahrirlashi mumkin")
+        if not cls._can_manage(user, event):
+            raise PermissionDenied("Faqat tadbir muallifi yoki uning yordamchisi tahrirlay oladi")
 
         cls._validate_in_future(validated_data['date'], validated_data['end_time'])
 
@@ -369,8 +378,8 @@ class EventService:
     @classmethod
     @transaction.atomic
     def delete(cls, event: Event, user: User) -> None:
-        if event.created_by_id != user.id and not user.is_superuser:
-            raise PermissionDenied("Faqat tadbir yaratuvchisi o'chirishi mumkin")
+        if not cls._can_manage(user, event):
+            raise PermissionDenied("Faqat tadbir muallifi yoki uning yordamchisi o'chira oladi")
 
         # DELETED bildirishnoma o'chirishdan OLDIN dispatch qilinadi
         # (Notification yozuvlari event_id ni bare UUID sifatida saqlaydi —

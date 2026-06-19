@@ -152,13 +152,31 @@ def publish_event_draft(draft: EventDraft) -> Event:
     if direction is None:
         raise ValidationError('Yo\'nalish (Direction) aniqlanmadi — bo\'lim (target_direction) tanlang')
 
+    # Aytilgan manzilni vazirlik zaliga moslashtirish: nom mos kelsa — zal band qilinadi
+    # (to'qnashuv qattiq bloklanadi), aks holda manzil oddiy matn (tashqi hudud) bo'lib qoladi.
+    from apps.events.booking import assert_no_conflict, sync_event_booking
+    from apps.events.models import Hall
+    loc = (draft.location or '').strip()
+    hall = None
+    if loc:
+        hall = (
+            Hall.objects.filter(name__iexact=loc).first()
+            or Hall.objects.filter(name__icontains=loc).first()
+        )
+    if hall is not None:
+        assert_no_conflict(
+            hall_id=hall.id, date=draft.date,
+            start_time=draft.start_time, end_time=draft.end_time,
+        )
+
     event = Event.objects.create(
         title=draft.title,
         description=draft.description,
         date=draft.date,
         start_time=draft.start_time,
         end_time=draft.end_time,
-        address=draft.location,
+        address='' if hall else loc,
+        hall=hall,
         sphere=draft.sphere,
         type=draft.event_type,
         is_important=draft.is_important,
@@ -169,6 +187,9 @@ def publish_event_draft(draft: EventDraft) -> Event:
         # resolve_principal: yaratuvchi yordamchi bo'lsa ham uning rahbariga keltiriladi.
         on_behalf_of=resolve_principal(draft.created_by),
     )
+
+    # Zal tanlangan bo'lsa — bandlikni yozamiz (tadbirga bog'langan bron)
+    sync_event_booking(event)
 
     # Qatnashchilar — aytilgan odamlar + yo'naltirilgan bo'lim boshlig'i
     participant_users = set(draft.suggested_participants.all())
