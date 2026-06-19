@@ -154,15 +154,16 @@ def publish_event_draft(draft: EventDraft) -> Event:
 
     # Aytilgan manzilni vazirlik zaliga moslashtirish: nom mos kelsa — zal band qilinadi
     # (to'qnashuv qattiq bloklanadi), aks holda manzil oddiy matn (tashqi hudud) bo'lib qoladi.
+    from apps.core.fuzzy import best_match
     from apps.events.booking import assert_no_conflict, sync_event_booking
     from apps.events.models import Hall
     loc = (draft.location or '').strip()
     hall = None
     if loc:
-        hall = (
-            Hall.objects.filter(name__iexact=loc).first()
-            or Hall.objects.filter(name__icontains=loc).first()
-        )
+        # Avval aniq mos, so'ng fuzzy (foizli o'xshashlik) — AI nomi to'liq mos kelmasligi mumkin
+        hall = Hall.objects.filter(name__iexact=loc).first()
+        if hall is None:
+            hall = best_match(loc, list(Hall.objects.all()), key=lambda h: h.name, threshold=0.5)
     if hall is not None:
         assert_no_conflict(
             hall_id=hall.id, date=draft.date,

@@ -137,21 +137,13 @@ def _resolve_direction(name: str) -> 'Direction | None':
     if direction:
         return direction
 
-    # 3. Birinchi 2 so'z bo'yicha
-    words = name_clean.split()
-    if len(words) >= 2:
-        first_two = ' '.join(words[:2])
-        direction = Direction.objects.filter(
-            Q(name_uz__icontains=first_two) | Q(name_ru__icontains=first_two)
-        ).first()
-        if direction:
-            return direction
-
-    # 4. Birinchi so'z bo'yicha (oxirgi imkoniyat)
-    direction = Direction.objects.filter(
-        Q(name_uz__icontains=words[0]) | Q(name_ru__icontains=words[0])
-    ).first()
-    return direction
+    # 3. Fuzzy — barcha bo'limlar bilan foizli o'xshashlik (AI nomi to'liq mos kelmasligi mumkin)
+    from apps.core.fuzzy import best_match
+    all_dirs = list(Direction.objects.all())
+    return (
+        best_match(name_clean, all_dirs, key=lambda d: d.name_uz, threshold=0.5)
+        or best_match(name_clean, all_dirs, key=lambda d: d.name_ru, threshold=0.5)
+    )
 
 
 def _find_head_of_direction(direction: 'Direction') -> 'User | None':
@@ -212,11 +204,18 @@ def _resolve_user_names(names: list[str]) -> tuple[list, list[str]]:
     Returns:
         (matched_users, unmatched_names) — moslangan User'lar va moslanmagan ismlar
     """
+    from apps.core.fuzzy import best_match
     from apps.users.models import User
 
     matched: list = []
     unmatched: list[str] = []
     seen_user_ids = set()
+
+    # Fuzzy fallback uchun (lazy yuklanadi — aniq mos topilmagan ismlar uchungina)
+    all_users: list | None = None
+
+    def _full_name(u) -> str:
+        return ' '.join(filter(None, [u.last_name, u.first_name, u.father_name]))
 
     for name in names:
         name_clean = name.strip()
@@ -261,7 +260,15 @@ def _resolve_user_names(names: list[str]) -> tuple[list, list[str]]:
                 matched.append(user)
                 seen_user_ids.add(user.id)
             else:
-                unmatched.append(name_clean)
+                # Fuzzy — foizli o'xshashlik bo'yicha eng yaqin foydalanuvchi (imlo/STT xatosi uchun)
+                if all_users is None:
+                    all_users = list(User.objects.filter(enabled=True))
+                fz = best_match(name_clean, all_users, key=_full_name, threshold=0.5)
+                if fz and fz.id not in seen_user_ids:
+                    matched.append(fz)
+                    seen_user_ids.add(fz.id)
+                else:
+                    unmatched.append(name_clean)
 
     return matched, unmatched
 
