@@ -59,7 +59,8 @@ def create_event_draft_from_intent(
         duration_minutes=intent.get('duration_minutes'),
         location=intent.get('location') or '',
         event_type=_map_event_type(intent.get('event_type')),
-        sphere=_map_sphere(intent.get('sphere')),
+        # Soha = aniqlangan asosiy yo'nalish (Direction id) — yordamchi tahrirda o'zgartira oladi
+        sphere=(str(target_direction.id) if target_direction is not None else ''),
         is_important=bool(intent.get('is_important')),
         is_private=bool(intent.get('is_private')),
         notify_minutes_before=intent.get('notify_minutes_before') or [60, 1440],
@@ -296,21 +297,6 @@ def _map_event_type(value) -> str:
         return val
     m = (best_match(val, pairs, key=lambda p: p[1], threshold=0.5)
          or best_match(val, pairs, key=lambda p: p[0], threshold=0.5))
-    return m[0] if m else ''
-
-
-def _map_sphere(value) -> str:
-    """AI bergan soha labelini Sphere qiymatiga (key) moslaydi (aniq label yoki fuzzy)."""
-    if not value:
-        return ''
-    from apps.core.fuzzy import best_match
-    from apps.info.enums import Sphere
-    val = str(value).strip()
-    pairs = list(Sphere.choices)  # (value, label)
-    for v, label in pairs:
-        if label.lower() == val.lower():
-            return v
-    m = best_match(val, pairs, key=lambda p: p[1], threshold=0.5)
     return m[0] if m else ''
 
 

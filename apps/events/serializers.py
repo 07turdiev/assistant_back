@@ -114,7 +114,7 @@ class EventInputSerializer(serializers.Serializer):
     description = serializers.CharField(required=False, allow_blank=True, default='')
     is_private = serializers.BooleanField(required=False, default=False)
     is_important = serializers.BooleanField(required=False, default=False)
-    sphere = serializers.CharField()
+    sphere = serializers.CharField(required=False, allow_blank=True, default='')
     type = serializers.CharField()
     notify_time_list = serializers.ListField(
         child=serializers.IntegerField(min_value=1),

@@ -29,7 +29,8 @@ class Event(AuditMixin):
     end_time = models.TimeField()
     address = models.CharField(max_length=255, blank=True, default='')
     serial_number = models.CharField(max_length=255, unique=True, null=True, blank=True)
-    sphere = models.CharField(max_length=128, choices=Sphere.choices)
+    # Soha = vazirlik yo'nalishi (Direction id). Eski enum qiymatlari ham saqlanishi mumkin.
+    sphere = models.CharField(max_length=128, blank=True, default='')
     type = models.CharField(max_length=32, choices=EventType.choices)
     is_important = models.BooleanField(default=False)
     is_private = models.BooleanField(default=False)

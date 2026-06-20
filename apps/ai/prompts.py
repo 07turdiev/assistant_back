@@ -46,10 +46,9 @@ def build_intent_system_prompt(today: date | None = None) -> str:
     today_weekday = WEEKDAYS_UZ[today.weekday()]
     calendar = _calendar_table(today)
 
-    # Tadbir turi va sohani enum'lardan dinamik o'qiymiz (DB bilan har doim sinxron)
-    from apps.info.enums import EventType, Sphere
+    # Tadbir turini enum'dan dinamik o'qiymiz (DB bilan har doim sinxron)
+    from apps.info.enums import EventType
     event_type_lines = '\n'.join(f'     - "{v}" — {label}' for v, label in EventType.choices)
-    sphere_labels = '\n'.join(f'     - "{label}"' for _v, label in Sphere.choices)
 
     return f"""Sen Madaniyat vazirligi raqamli yordamchisining tushunish modulisan. /no_think
 
@@ -73,7 +72,6 @@ JSON sxemasi (FAQAT shu maydonlarni ishlatasan, qo'shimcha hech narsa yo'q):
   "duration_minutes": integer yoki null,
   "location": "string yoki null",
   "event_type": "string yoki null",
-  "sphere": "string yoki null",
   "is_important": false,
   "is_private": false,
 
@@ -147,13 +145,6 @@ QOIDALAR:
    Misol: "selektor" → "Selector"; "kollegiya"/"majlis"/"yig'ilish" → "Collection"; \
    "prezidium" → "Presidium"; "uchrashuv" → "Meeting"; "taqdimot" → "Presentation".
 
-4c. SOHA (`sphere`) — FAQAT type=event uchun. Tadbir mavzusiga eng mos sohani quyidagi \
-   RO'YXATDAN aniq label bilan tanlaysan, aniqlanmasa — null:
-{sphere_labels}
-   Misol: "raqamlashtirish", "sun'iy intellekt", "axborot texnologiyalari" → "AKT sohasi"; \
-   "teatr", "konsert", "san'at", "madaniyat" → "Madaniyat ishlari"; \
-   "sport", "musobaqa" → "Jismoniy tarbiya va sport".
-
 5. ISHTIROKCHILAR (`mentioned_participants`):
    - Faqat ISM (yoki ism+familiya) qaytar. "aka", "opa", "domla", "uka" kabi murojaatlarni TASHLAB YUBOR.
      "Akmal aka" → "Akmal", "Sanjar akaga" → "Sanjar", "Behzod akaga" → "Behzod"
@@ -199,32 +190,32 @@ QOIDALAR:
 MISOLLAR:
 
 Foydalanuvchi: "Ertaga soat 14 da Senat zalida kollegiya yig'ilishi, Akmal aka ma'ruzachi, 90 daqiqa"
-{{"type":"event","title":"Kollegiya yig'ilishi","description":null,"date":"{_add(today, 1)}","start_time":"14:00","end_time":"15:30","duration_minutes":90,"location":"Senat zali","event_type":"Collection","sphere":null,"is_important":false,"is_private":false,"target_department":null,"participant_departments":[],"mentioned_participants":["Akmal"],"notify_minutes_before":[60,1440]}}
+{{"type":"event","title":"Kollegiya yig'ilishi","description":null,"date":"{_add(today, 1)}","start_time":"14:00","end_time":"15:30","duration_minutes":90,"location":"Senat zali","event_type":"Collection","is_important":false,"is_private":false,"target_department":null,"participant_departments":[],"mentioned_participants":["Akmal"],"notify_minutes_before":[60,1440]}}
 
 Foydalanuvchi: "Ertaga vazirlik binosida raqamlashtirish va sun'iy intellekt yo'nalishi bo'yicha selektor bo'lib o'tadi, bunga teatr konsert tomosha yo'nalishlari qatnashishi kerak"
 # DIQQAT: "selektor" → event_type "Selector"; asosiy mavzu → target_department "raqamlashtirish va sun'iy intellekt";
-# "teatr konsert tomosha yo'nalishlari qatnashsin" → participant_departments ["teatr","konsert","tomosha"]; sphere "AKT sohasi"
-{{"type":"event","title":"Raqamlashtirish va sun'iy intellekt bo'yicha selektor","description":null,"date":"{_add(today, 1)}","start_time":null,"end_time":null,"duration_minutes":null,"location":"vazirlik binosi","event_type":"Selector","sphere":"AKT sohasi","is_important":false,"is_private":false,"target_department":"raqamlashtirish va sun'iy intellekt","participant_departments":["teatr","konsert","tomosha"],"mentioned_participants":[],"notify_minutes_before":[60,1440]}}
+# "teatr konsert tomosha yo'nalishlari qatnashsin" → participant_departments ["teatr","konsert","tomosha"]
+{{"type":"event","title":"Raqamlashtirish va sun'iy intellekt bo'yicha selektor","description":null,"date":"{_add(today, 1)}","start_time":null,"end_time":null,"duration_minutes":null,"location":"vazirlik binosi","event_type":"Selector","is_important":false,"is_private":false,"target_department":"raqamlashtirish va sun'iy intellekt","participant_departments":["teatr","konsert","tomosha"],"mentioned_participants":[],"notify_minutes_before":[60,1440]}}
 
 Foydalanuvchi: "Sherzodga aytinglar Toshkent viloyat hisobotini juma kuniga tayyorlasin, muhim"
-{{"type":"report","title":"Toshkent viloyat hisobotini tayyorlash","description":"Juma kuniga tayyor bo'lishi kerak","date":null,"start_time":null,"end_time":null,"duration_minutes":null,"location":null,"event_type":null,"sphere":null,"is_important":true,"is_private":false,"target_department":null,"participant_departments":[],"mentioned_participants":["Sherzod"],"notify_minutes_before":[60]}}
+{{"type":"report","title":"Toshkent viloyat hisobotini tayyorlash","description":"Juma kuniga tayyor bo'lishi kerak","date":null,"start_time":null,"end_time":null,"duration_minutes":null,"location":null,"event_type":null,"is_important":true,"is_private":false,"target_department":null,"participant_departments":[],"mentioned_participants":["Sherzod"],"notify_minutes_before":[60]}}
 
 Foydalanuvchi: "Moliya boshqaruvi byudjet hisobotini 3 kun ichida tayyorlasin"
-{{"type":"report","title":"Byudjet hisobotini tayyorlash","description":"3 kun ichida bajarilishi kerak","date":null,"start_time":null,"end_time":null,"duration_minutes":null,"location":null,"event_type":null,"sphere":null,"is_important":false,"is_private":false,"target_department":"Moliya boshqaruvi","participant_departments":[],"mentioned_participants":[],"notify_minutes_before":[1440]}}
+{{"type":"report","title":"Byudjet hisobotini tayyorlash","description":"3 kun ichida bajarilishi kerak","date":null,"start_time":null,"end_time":null,"duration_minutes":null,"location":null,"event_type":null,"is_important":false,"is_private":false,"target_department":"Moliya boshqaruvi","participant_departments":[],"mentioned_participants":[],"notify_minutes_before":[1440]}}
 
 Foydalanuvchi: "Yordamchimga ayting bugun choyxonadagi tushlik uchrashuvini bekor qilsin"
-{{"type":"report","title":"Tushlik uchrashuvini bekor qilish","description":"Choyxonadagi tushlik uchrashuvini bekor qilish kerak","date":null,"start_time":null,"end_time":null,"duration_minutes":null,"location":null,"event_type":null,"sphere":null,"is_important":false,"is_private":false,"target_department":null,"participant_departments":[],"mentioned_participants":[],"notify_minutes_before":[60]}}
+{{"type":"report","title":"Tushlik uchrashuvini bekor qilish","description":"Choyxonadagi tushlik uchrashuvini bekor qilish kerak","date":null,"start_time":null,"end_time":null,"duration_minutes":null,"location":null,"event_type":null,"is_important":false,"is_private":false,"target_department":null,"participant_departments":[],"mentioned_participants":[],"notify_minutes_before":[60]}}
 
 Foydalanuvchi: "Indinga ertalab soat 10 da yopiq prezidium, ishtirokchilar Bekzod va Dilshod"
-{{"type":"event","title":"Yopiq prezidium","description":null,"date":"{_add(today, 2)}","start_time":"10:00","end_time":null,"duration_minutes":null,"location":null,"event_type":"Presidium","sphere":null,"is_important":false,"is_private":true,"target_department":null,"participant_departments":[],"mentioned_participants":["Bekzod","Dilshod"],"notify_minutes_before":[60,1440]}}
+{{"type":"event","title":"Yopiq prezidium","description":null,"date":"{_add(today, 2)}","start_time":"10:00","end_time":null,"duration_minutes":null,"location":null,"event_type":"Presidium","is_important":false,"is_private":true,"target_department":null,"participant_departments":[],"mentioned_participants":["Bekzod","Dilshod"],"notify_minutes_before":[60,1440]}}
 
 Foydalanuvchi: "Chorshanba kuni 15 00 da sport bo'yicha seminar, qatnashadi Olim, Salim va Karim, Xalq do'stligi muzeyida"
 # DIQQAT: "Xalq do'stligi muzeyida" → "Xalq do'stligi muzeyi" (atribut SAQLANGAN); "seminar" → Seminar; "sport" → sport sohasi
-{{"type":"event","title":"Sport bo'yicha seminar","description":null,"date":null,"start_time":"15:00","end_time":null,"duration_minutes":null,"location":"Xalq do'stligi muzeyi","event_type":"Seminar","sphere":"Jismoniy tarbiya va sport","is_important":false,"is_private":false,"target_department":null,"participant_departments":[],"mentioned_participants":["Olim","Salim","Karim"],"notify_minutes_before":[60,1440]}}
+{{"type":"event","title":"Sport bo'yicha seminar","description":null,"date":null,"start_time":"15:00","end_time":null,"duration_minutes":null,"location":"Xalq do'stligi muzeyi","event_type":"Seminar","is_important":false,"is_private":false,"target_department":null,"participant_departments":[],"mentioned_participants":["Olim","Salim","Karim"],"notify_minutes_before":[60,1440]}}
 
 Foydalanuvchi: "12-may juma kuni 10 30 da prezidium, davomiyligi 2 soat"
 # DIQQAT: aniq sana "12-may" berilgan, "juma" so'zi e'tiborsiz qoldiriladi.
 # Sana jadvaldan FAQAT 12-may qator orqali topiladi (hafta kuni qaramay).
-{{"type":"event","title":"Prezidium","description":null,"date":"2026-05-12","start_time":"10:30","end_time":"12:30","duration_minutes":120,"location":null,"event_type":"Presidium","sphere":null,"is_important":false,"is_private":false,"target_department":null,"participant_departments":[],"mentioned_participants":[],"notify_minutes_before":[60,1440]}}
+{{"type":"event","title":"Prezidium","description":null,"date":"2026-05-12","start_time":"10:30","end_time":"12:30","duration_minutes":120,"location":null,"event_type":"Presidium","is_important":false,"is_private":false,"target_department":null,"participant_departments":[],"mentioned_participants":[],"notify_minutes_before":[60,1440]}}
 """
 

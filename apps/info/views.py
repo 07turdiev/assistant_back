@@ -9,7 +9,7 @@ from apps.users.enums import RoleName, UserStatus
 from apps.users.models import Role
 from apps.users.serializers import RoleSerializer
 
-from .enums import REPLY_CHOICES, EventType, Sphere
+from .enums import REPLY_CHOICES, EventType
 
 
 def _localized(label_uz: str, label_ru: str) -> str:
@@ -22,10 +22,26 @@ def _choices_to_payload(choices):
 
 
 class SpheresView(APIView):
+    """Soha ro'yxati — vazirlik tuzilmasidagi yo'nalishlar (Direction) dinamik.
+
+    Qiymat (value) sifatida Direction id saqlanadi; ko'rsatishda lookup orqali nomga
+    o'giriladi. Eski enum-soha qiymatlari (mavjud bo'lsa) raw ko'rinishda qoladi.
+    """
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        return Response(_choices_to_payload(Sphere.choices))
+        from apps.directions.models import Direction
+        dirs = Direction.objects.all().order_by('name_uz')
+        items = [
+            {
+                'value': str(d.id),
+                'label': _localized(d.name_uz, d.name_ru),
+                'name_uz': d.name_uz,
+                'name_ru': d.name_ru,
+            }
+            for d in dirs
+        ]
+        return Response(items)
 
 
 class TypesView(APIView):
