@@ -17,7 +17,7 @@ from rest_framework import serializers
 from apps.attachments.serializers import AttachmentSerializer
 from apps.users.serializers import UserShortSerializer
 
-from .models import Event, EventParticipant, Hall, HallBooking, Visitor
+from .models import Event, EventParticipant, Hall, HallBooking, Sphere, Visitor
 
 
 class VisitorSerializer(serializers.ModelSerializer):
@@ -183,6 +183,14 @@ class HallSerializer(serializers.ModelSerializer):
     class Meta:
         model = Hall
         fields = ('id', 'floor', 'name')
+
+
+class SphereSerializer(serializers.ModelSerializer):
+    """Tadbir sohasi — nom (admin paneldan boshqariladi)."""
+
+    class Meta:
+        model = Sphere
+        fields = ('id', 'name')
 
 
 class HallBookingSerializer(serializers.ModelSerializer):

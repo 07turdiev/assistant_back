@@ -59,8 +59,8 @@ def create_event_draft_from_intent(
         duration_minutes=intent.get('duration_minutes'),
         location=intent.get('location') or '',
         event_type=_map_event_type(intent.get('event_type')),
-        # Soha = aniqlangan asosiy yo'nalish (Direction id) — yordamchi tahrirda o'zgartira oladi
-        sphere=(str(target_direction.id) if target_direction is not None else ''),
+        # Soha — boshqariladigan ro'yxatdan yordamchi tahrirda tanlaydi
+        sphere='',
         is_important=bool(intent.get('is_important')),
         is_private=bool(intent.get('is_private')),
         notify_minutes_before=intent.get('notify_minutes_before') or [60, 1440],

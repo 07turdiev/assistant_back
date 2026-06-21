@@ -2,7 +2,7 @@
 from django.db import models
 
 from apps.core.models import AuditMixin
-from apps.info.enums import EventType, NotificationType, Sphere  # noqa: F401
+from apps.info.enums import EventType, NotificationType  # noqa: F401
 
 
 class Event(AuditMixin):
@@ -136,6 +136,24 @@ class Hall(models.Model):
 
     def __str__(self) -> str:
         return f'{self.floor}-etaj: {self.name}'
+
+
+class Sphere(models.Model):
+    """Tadbir sohasi (yo'nalishi) — admin paneldan boshqariladi (xuddi zallar kabi).
+
+    Misol: "Madaniyat", "San'at", "Kino", "Teatr", "Raqamlashtirish".
+    Event.sphere shu yozuvning id'sini (matn ko'rinishida) saqlaydi.
+    """
+
+    name = models.CharField(max_length=255, unique=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = 'Soha'
+        verbose_name_plural = 'Sohalar'
+
+    def __str__(self) -> str:
+        return self.name
 
 
 class HallBooking(AuditMixin):

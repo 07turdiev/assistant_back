@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Event, EventParticipant, Visitor
+from .models import Event, EventParticipant, Sphere, Visitor
 
 
 class VisitorInline(admin.TabularInline):
@@ -16,12 +16,18 @@ class EventParticipantInline(admin.TabularInline):
 
 @admin.register(Event)
 class EventAdmin(admin.ModelAdmin):
-    list_display = ('title', 'date', 'start_time', 'end_time', 'sphere', 'type', 'is_important')
-    list_filter = ('type', 'sphere', 'is_important', 'is_private')
+    list_display = ('title', 'date', 'start_time', 'end_time', 'type', 'is_important')
+    list_filter = ('type', 'is_important', 'is_private')
     search_fields = ('title', 'description', 'address')
     raw_id_fields = ('direction', 'speaker', 'created_by', 'updated_by')
     readonly_fields = ('id', 'created_at', 'updated_at', 'created_by', 'updated_by')
     inlines = [VisitorInline, EventParticipantInline]
+
+
+@admin.register(Sphere)
+class SphereAdmin(admin.ModelAdmin):
+    list_display = ('name',)
+    search_fields = ('name',)
 
 
 @admin.register(Visitor)

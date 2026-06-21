@@ -22,24 +22,18 @@ def _choices_to_payload(choices):
 
 
 class SpheresView(APIView):
-    """Soha ro'yxati — vazirlik tuzilmasidagi yo'nalishlar (Direction) dinamik.
+    """Soha ro'yxati — admin paneldan boshqariladigan Sohalar (Sphere modeli).
 
-    Qiymat (value) sifatida Direction id saqlanadi; ko'rsatishda lookup orqali nomga
-    o'giriladi. Eski enum-soha qiymatlari (mavjud bo'lsa) raw ko'rinishda qoladi.
+    Qiymat (value) sifatida Sphere id (matn) saqlanadi; ko'rsatishda lookup orqali
+    nomga o'giriladi.
     """
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        from apps.directions.models import Direction
-        dirs = Direction.objects.all().order_by('name_uz')
+        from apps.events.models import Sphere
         items = [
-            {
-                'value': str(d.id),
-                'label': _localized(d.name_uz, d.name_ru),
-                'name_uz': d.name_uz,
-                'name_ru': d.name_ru,
-            }
-            for d in dirs
+            {'value': str(s.id), 'label': s.name}
+            for s in Sphere.objects.all().order_by('name')
         ]
         return Response(items)
 

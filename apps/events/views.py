@@ -17,7 +17,7 @@ from apps.users.enums import RoleName
 from apps.users.models import User
 
 from .booking import assert_no_conflict, conflict_message, find_conflict
-from .models import Event, Hall, HallBooking
+from .models import Event, Hall, HallBooking, Sphere
 from .serializers import (
     EventDetailSerializer,
     EventForwardSerializer,
@@ -26,6 +26,7 @@ from .serializers import (
     HallBookingCreateSerializer,
     HallBookingSerializer,
     HallSerializer,
+    SphereSerializer,
 )
 from .services import EventService, calendar_for_vice, calendar_user_ids
 
@@ -275,6 +276,18 @@ class HallViewSet(viewsets.ModelViewSet):
     """Yig'ilish zallari — admin paneldan boshqariladi (ko'rish — barcha auth user)."""
     queryset = Hall.objects.all()
     serializer_class = HallSerializer
+    pagination_class = None
+
+    def get_permissions(self):
+        if self.action in ('list', 'retrieve'):
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), IsAdminRole()]
+
+
+class SphereViewSet(viewsets.ModelViewSet):
+    """Tadbir sohalari — admin paneldan boshqariladi (ko'rish — barcha auth user)."""
+    queryset = Sphere.objects.all()
+    serializer_class = SphereSerializer
     pagination_class = None
 
     def get_permissions(self):

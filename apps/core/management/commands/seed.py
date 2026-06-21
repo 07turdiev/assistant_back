@@ -7,7 +7,7 @@ from django.utils import timezone
 
 from apps.directions.models import Direction
 from apps.events.models import Event, EventParticipant, Visitor
-from apps.info.enums import EventType, NotificationType, Sphere  # noqa: F401
+from apps.info.enums import EventType, NotificationType  # noqa: F401
 from apps.organisations.models import District, Organisation, Region
 from apps.users.enums import RoleName
 from apps.users.models import Role, User
@@ -82,7 +82,7 @@ class Command(BaseCommand):
                 'start_time': time(10, 0),
                 'end_time': time(12, 0),
                 'address': 'Vazirlik bosh binosi, 3-qavat, Katta zal',
-                'sphere': Sphere.CULTURAL_WORKS,
+                'sphere': '',
                 'type': EventType.COLLECTION,
                 'is_important': True,
                 'speaker': premier,
@@ -95,7 +95,7 @@ class Command(BaseCommand):
                 'start_time': time(14, 30),
                 'end_time': time(16, 0),
                 'address': 'Konferens-zal',
-                'sphere': Sphere.CULTURAL_WORKS,
+                'sphere': '',
                 'type': EventType.DISCUSSION,
                 'is_important': False,
                 'speaker': premier,
